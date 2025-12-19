@@ -347,97 +347,10 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
     }
   }
 
-  /// Construye el widget selector de fotografía
-  Widget _construirSelectorFoto() {
-    return GestureDetector(
-      onTap: _seleccionarImagen,
-      child: Container(
-        height: 200,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFE2E8F0), width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: _rutaFotoTemporal != null
-            ? Stack(
-                children: [
-                  /// Mostrar imagen seleccionada
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.file(
-                      File(_rutaFotoTemporal!),
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                    ),
-                  ),
-
-                  /// Botón para cambiar imagen
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFD4AF37),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      padding: const EdgeInsets.all(8),
-                      child: const Icon(
-                        FontAwesomeIcons.edit,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                    ),
-                  ),
-                ],
-              )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  /// Ícono de cámara
-                  Icon(
-                    FontAwesomeIcons.camera,
-                    size: 48,
-                    color: const Color(0xFF1E3A8A),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  /// Texto de instrucción
-                  Text(
-                    'Seleccionar Foto',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF1E3A8A),
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  /// Subtexto
-                  Text(
-                    'Toca para seleccionar una imagen de la galería',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: const Color(0xFF94A3B8),
-                    ),
-                  ),
-                ],
-              ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final esDesktop = MediaQuery.of(context).size.width > 800;
+
     return Scaffold(
       /// AppBar con título dinámico
       appBar: AppBar(
@@ -449,183 +362,365 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
 
       /// Cuerpo del formulario
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
         child: Form(
           key: _claveFormulario,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              /// ==================== SECCIÓN 0: FOTO DEL GALLO ====================
-              _construirSelectorFoto(),
-              const SizedBox(height: 32),
-
-              /// ==================== SECCIÓN 1: IDENTIFICACIÓN ====================
-              _construirTituloSeccion('Identificación'),
-              const SizedBox(height: 16),
-
-              /// Campo: Placa
-              TextFormField(
-                controller: _controladorPlaca,
-                decoration: _construirDecoracionCampo('Placa (Anillo)'),
-                validator: (valor) {
-                  if (valor == null || valor.trim().isEmpty) {
-                    return 'La placa es obligatoria';
-                  }
-
-                  // Validar que la placa no esté duplicada
-                  final gallosProveedor = context.read<GallosProveedor>();
-                  final placaTrimmed = valor.trim();
-
-                  // En modo edición, permitir la placa actual
-                  if (_esEdicion && widget.galloEditar!.placa == placaTrimmed) {
-                    return null;
-                  }
-
-                  // Si la placa existe en otro gallo, mostrar error
-                  if (gallosProveedor.validarPlacaDuplicada(placaTrimmed)) {
-                    return 'Esta placa ya está registrada en otro gallo';
-                  }
-
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              /// Campo: Nombre
-              TextFormField(
-                controller: _controladorNombre,
-                decoration: _construirDecoracionCampo('Nombre'),
-                validator: (valor) {
-                  if (valor == null || valor.trim().isEmpty) {
-                    return 'El nombre es obligatorio';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 32),
-
-              /// ==================== SECCIÓN 2: CARACTERÍSTICAS FÍSICAS ====================
-              _construirTituloSeccion('Características Físicas'),
-              const SizedBox(height: 16),
-
-              /// Campo: Color de Pluma
-              TextFormField(
-                controller: _controladorColorPluma,
-                decoration: _construirDecoracionCampo('Color de Pluma'),
-                validator: (valor) {
-                  if (valor == null || valor.trim().isEmpty) {
-                    return 'El color de pluma es obligatorio';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              /// Dropdown: Sexo
-              DropdownButtonFormField<String>(
-                value: _sexoSeleccionado,
-                decoration: _construirDecoracionCampo('Sexo'),
-                items: const [
-                  DropdownMenuItem(value: 'Macho', child: Text('Macho')),
-                  DropdownMenuItem(value: 'Hembra', child: Text('Hembra')),
-                ],
-                onChanged: (valor) {
-                  setState(() {
-                    _sexoSeleccionado = valor;
-                  });
-                },
-                validator: (valor) {
-                  if (valor == null) {
-                    return 'Por favor selecciona un sexo';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 32),
-
-              /// ==================== SECCIÓN 3: GENEALOGÍA ====================
-              _construirTituloSeccion('Genealogía'),
-              const SizedBox(height: 16),
-
-              /// Campo: Línea Genética
-              TextFormField(
-                controller: _controladorLineaGenetica,
-                decoration: _construirDecoracionCampo(
-                  'Línea Genética (Ej: Kelso, Sweater)',
+              /// ==================== SECCIÓN 0: FOTO (ENCABEZADO) ====================
+              Center(
+                child: Column(
+                  children: [
+                    GestureDetector(
+                      onTap: _seleccionarImagen,
+                      child: Container(
+                        width: 180,
+                        height: 180,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color(0xFFE2E8F0),
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: _rutaFotoTemporal != null
+                            ? Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: Image.file(
+                                      File(_rutaFotoTemporal!),
+                                      fit: BoxFit.cover,
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 8,
+                                    right: 8,
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFD4AF37),
+                                        borderRadius: BorderRadius.circular(8),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(
+                                              0.2,
+                                            ),
+                                            blurRadius: 6,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      padding: const EdgeInsets.all(8),
+                                      child: const Icon(
+                                        FontAwesomeIcons.edit,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    FontAwesomeIcons.camera,
+                                    size: 48,
+                                    color: const Color(0xFF1E3A8A),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'Agregar Foto',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF1E3A8A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Toca la imagen para cambiarla',
+                      style: GoogleFonts.poppins(
+                        fontSize: 12,
+                        color: const Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ],
                 ),
-                validator: (valor) {
-                  if (valor == null || valor.trim().isEmpty) {
-                    return 'La línea genética es obligatoria';
-                  }
-                  return null;
-                },
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 40),
 
-              /// ==================== SECCIÓN 4: DATOS ADICIONALES ====================
-              _construirTituloSeccion('Datos Adicionales'),
-              const SizedBox(height: 16),
+              /// ==================== TARJETA 1: IDENTIFICACIÓN ====================
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Identificación',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF1E3A8A),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _controladorPlaca,
+                              decoration: _construirDecoracionCampo(
+                                'Placa (Anillo)',
+                              ),
+                              validator: (valor) {
+                                if (valor == null || valor.trim().isEmpty) {
+                                  return 'La placa es obligatoria';
+                                }
 
-              /// Selector de Fecha
-              TextFormField(
-                controller: _controladorFechaNacimiento,
-                decoration: _construirDecoracionCampo(
-                  'Fecha de Nacimiento',
-                  sufijo: GestureDetector(
-                    onTap: _abrirSelectorFecha,
-                    child: const Icon(Icons.calendar_today),
+                                final gallosProveedor = context
+                                    .read<GallosProveedor>();
+                                final placaTrimmed = valor.trim();
+
+                                if (_esEdicion &&
+                                    widget.galloEditar!.placa == placaTrimmed) {
+                                  return null;
+                                }
+
+                                if (gallosProveedor.validarPlacaDuplicada(
+                                  placaTrimmed,
+                                )) {
+                                  return 'Esta placa ya está registrada';
+                                }
+
+                                return null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _controladorNombre,
+                              decoration: _construirDecoracionCampo('Nombre'),
+                              validator: (valor) {
+                                if (valor == null || valor.trim().isEmpty) {
+                                  return 'El nombre es obligatorio';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                readOnly: true,
-                validator: (valor) {
-                  if (_fechaNacimientoSeleccionada == null) {
-                    return 'La fecha de nacimiento es obligatoria';
-                  }
-                  return null;
-                },
-                onTap: _abrirSelectorFecha,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
 
-              /// Campo: Fase Lunar
-              TextFormField(
-                controller: _controladorFaseLunar,
-                decoration: _construirDecoracionCampo(
-                  'Fase Lunar (Ej: Luna Nueva, Llena)',
+              /// ==================== TARJETA 2: CARACTERÍSTICAS ====================
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                validator: (valor) {
-                  if (valor == null || valor.trim().isEmpty) {
-                    return 'La fase lunar es obligatoria';
-                  }
-                  return null;
-                },
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Características',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF1E3A8A),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _sexoSeleccionado,
+                              decoration: _construirDecoracionCampo('Sexo'),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'Macho',
+                                  child: Text('Macho'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'Hembra',
+                                  child: Text('Hembra'),
+                                ),
+                              ],
+                              onChanged: (valor) {
+                                setState(() {
+                                  _sexoSeleccionado = valor;
+                                });
+                              },
+                              validator: (valor) {
+                                if (valor == null) {
+                                  return 'Selecciona sexo';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _controladorColorPluma,
+                              decoration: _construirDecoracionCampo(
+                                'Color de Pluma',
+                              ),
+                              validator: (valor) {
+                                if (valor == null || valor.trim().isEmpty) {
+                                  return 'Ingresa el color';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _estadoSeleccionado,
+                              decoration: _construirDecoracionCampo('Estado'),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'Activo',
+                                  child: Text('Activo'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'Vendido',
+                                  child: Text('Vendido'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'Retirado',
+                                  child: Text('Retirado'),
+                                ),
+                              ],
+                              onChanged: (valor) {
+                                setState(() {
+                                  _estadoSeleccionado = valor;
+                                });
+                              },
+                              validator: (valor) {
+                                if (valor == null) {
+                                  return 'Selecciona estado';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      TextFormField(
+                        controller: _controladorLineaGenetica,
+                        decoration: _construirDecoracionCampo(
+                          'Línea Genética (Ej: Kelso, Sweater)',
+                        ),
+                        validator: (valor) {
+                          if (valor == null || valor.trim().isEmpty) {
+                            return 'La línea genética es obligatoria';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
 
-              /// Dropdown: Estado
-              DropdownButtonFormField<String>(
-                value: _estadoSeleccionado,
-                decoration: _construirDecoracionCampo('Estado'),
-                items: const [
-                  DropdownMenuItem(value: 'Activo', child: Text('Activo')),
-                  DropdownMenuItem(value: 'Vendido', child: Text('Vendido')),
-                  DropdownMenuItem(value: 'Baja', child: Text('Baja')),
-                ],
-                onChanged: (valor) {
-                  setState(() {
-                    _estadoSeleccionado = valor;
-                  });
-                },
-                validator: (valor) {
-                  if (valor == null) {
-                    return 'Por favor selecciona un estado';
-                  }
-                  return null;
-                },
+              /// ==================== TARJETA 3: ORIGEN ====================
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Origen',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF1E3A8A),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _controladorFechaNacimiento,
+                              decoration: _construirDecoracionCampo(
+                                'Fecha de Nacimiento',
+                                sufijo: GestureDetector(
+                                  onTap: _abrirSelectorFecha,
+                                  child: const Icon(Icons.calendar_today),
+                                ),
+                              ),
+                              readOnly: true,
+                              validator: (valor) {
+                                if (_fechaNacimientoSeleccionada == null) {
+                                  return 'Selecciona fecha';
+                                }
+                                return null;
+                              },
+                              onTap: _abrirSelectorFecha,
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _controladorFaseLunar,
+                              decoration: _construirDecoracionCampo(
+                                'Fase Lunar (Ej: Luna Nueva)',
+                              ),
+                              validator: (valor) {
+                                if (valor == null || valor.trim().isEmpty) {
+                                  return 'La fase lunar es obligatoria';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
 
-              /// Campo: Notas (Opcional)
+              /// ==================== CAMPO DE NOTAS ====================
               TextFormField(
                 controller: _controladorNotas,
                 decoration: _construirDecoracionCampo('Notas (Opcional)'),
@@ -633,25 +728,28 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
               ),
               const SizedBox(height: 32),
 
-              /// ==================== BOTÓN DE ACCIÓN ====================
+              /// ==================== BOTÓN GUARDAR ====================
               ElevatedButton(
                 onPressed: _guardarFormulario,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD4AF37), // Dorado
+                  backgroundColor: const Color(0xFFD4AF37),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 18),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                   ),
+                  elevation: 4,
                 ),
                 child: Text(
                   _esEdicion ? 'Actualizar Gallo' : 'Crear Gallo',
                   style: GoogleFonts.poppins(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ),
+              const SizedBox(height: 20),
             ],
           ),
         ),
@@ -677,18 +775,6 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
         color: const Color(0xFF64748B),
       ),
       suffixIcon: sufijo,
-    );
-  }
-
-  /// Construye el título de una sección del formulario
-  Widget _construirTituloSeccion(String titulo) {
-    return Text(
-      titulo,
-      style: GoogleFonts.poppins(
-        fontSize: 16,
-        fontWeight: FontWeight.w600,
-        color: const Color(0xFF1E3A8A),
-      ),
     );
   }
 }
