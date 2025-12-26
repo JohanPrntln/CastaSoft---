@@ -11,12 +11,14 @@ import 'package:castasoft/modelos/gallo_modelo.dart';
 /// y layout horizontal con miniatura, detalles y estado.
 class TarjetaGallo extends StatelessWidget {
   final Gallo gallo;
+  final VoidCallback? onTap;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
   const TarjetaGallo({
     Key? key,
     required this.gallo,
+    this.onTap,
     this.onEdit,
     this.onDelete,
   }) : super(key: key);

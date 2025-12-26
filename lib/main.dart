@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:castasoft/pantallas/pantalla_inicio.dart';
+import 'package:castasoft/pantallas/pantalla_login.dart';
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
 import 'package:castasoft/datos/ayudante_db.dart';
 
@@ -93,8 +94,14 @@ class AplicacionCastaSoft extends StatelessWidget {
         ],
         locale: const Locale('es', 'ES'), // Locale por defecto
         /// Pantalla inicial de la aplicación
-        /// Apunta a PantallaInicio que es el dashboard principal
-        home: const PantallaInicio(),
+        /// Apunta a PantallaLogin que es la pantalla de autenticación
+        home: const PantallaLogin(),
+
+        /// Rutas nombradas para navegación
+        routes: {
+          '/login': (context) => const PantallaLogin(),
+          '/inicio': (context) => const PantallaInicio(),
+        },
 
         /// Desactiva el banner de debug en la esquina superior derecha
         debugShowCheckedModeBanner: false,

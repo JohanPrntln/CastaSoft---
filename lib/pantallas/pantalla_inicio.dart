@@ -7,6 +7,7 @@ import 'package:castasoft/proveedores/gallos_proveedor.dart';
 import 'package:castasoft/componentes/tarjeta_kpi.dart';
 import 'package:castasoft/componentes/tarjeta_gallo.dart';
 import 'package:castasoft/pantallas/pantalla_formulario_gallo.dart';
+import 'package:castasoft/pantallas/pantalla_detalle_gallo.dart';
 import 'package:castasoft/modelos/gallo_modelo.dart';
 
 /// Pantalla de Inicio (Dashboard) - Vista Principal de CastaSoft
@@ -72,6 +73,29 @@ class _PantallaInicioState extends State<PantallaInicio> {
         ),
       ),
     );
+  }
+
+  /// Navega a la pantalla de detalle del gallo y maneja los retornos
+  Future<void> _navegarADetalleGallo(BuildContext context, Gallo gallo) async {
+    final resultado = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PantallaDetalleGallo(gallo: gallo),
+      ),
+    );
+
+    if (resultado == 'editar' && mounted) {
+      // Navegar a la pantalla de edición
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PantallaFormularioGallo(galloEditar: gallo),
+        ),
+      ).then((_) => context.read<GallosProveedor>().cargarGallos());
+    } else if (resultado == 'eliminar' && mounted) {
+      // Mostrar confirmación y eliminar
+      _mostrarConfirmacionEliminar(context, gallo);
+    }
   }
 
   /// Muestra un diálogo de confirmación antes de eliminar un gallo
@@ -388,19 +412,26 @@ class _PantallaInicioState extends State<PantallaInicio> {
                         const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final gallo = gallos[index];
-                      return TarjetaGallo(
-                        gallo: gallo,
-                        onEdit: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  PantallaFormularioGallo(galloEditar: gallo),
-                            ),
-                          );
-                        },
-                        onDelete: () =>
-                            _mostrarConfirmacionEliminar(context, gallo),
+                      return GestureDetector(
+                        onTap: () => _navegarADetalleGallo(context, gallo),
+                        child: TarjetaGallo(
+                          gallo: gallo,
+                          onEdit: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    PantallaFormularioGallo(galloEditar: gallo),
+                              ),
+                            ).then(
+                              (_) => context
+                                  .read<GallosProveedor>()
+                                  .cargarGallos(),
+                            );
+                          },
+                          onDelete: () =>
+                              _mostrarConfirmacionEliminar(context, gallo),
+                        ),
                       );
                     },
                   ),

@@ -445,6 +445,12 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
       'Blanco',
       'Miel',
     ];
+    const List<String> kFasesLunares = [
+      'Luna Nueva',
+      'Cuarto Creciente',
+      'Luna Llena',
+      'Cuarto Menguante',
+    ];
 
     return Scaffold(
       appBar: AppBar(
@@ -991,17 +997,64 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
                           ),
                           const SizedBox(width: 20),
                           Expanded(
-                            child: TextFormField(
-                              controller: _controladorFaseLunar,
-                              decoration: _construirDecoracionCampo(
-                                'Fase Lunar (Ej: Luna Nueva)',
+                            child: Autocomplete<String>(
+                              initialValue: TextEditingValue(
+                                text: _controladorFaseLunar.text,
                               ),
-                              validator: (valor) {
-                                if (valor == null || valor.trim().isEmpty) {
-                                  return 'La fase lunar es obligatoria';
-                                }
-                                return null;
+                              optionsBuilder:
+                                  (TextEditingValue textEditingValue) {
+                                    if (textEditingValue.text.isEmpty) {
+                                      return kFasesLunares;
+                                    }
+                                    return kFasesLunares.where(
+                                      (fase) => fase.toLowerCase().contains(
+                                        textEditingValue.text.toLowerCase(),
+                                      ),
+                                    );
+                                  },
+                              onSelected: (selection) {
+                                setState(() {
+                                  _controladorFaseLunar.text = selection;
+                                });
                               },
+                              fieldViewBuilder:
+                                  (
+                                    context,
+                                    textEditingController,
+                                    focusNode,
+                                    onFieldSubmitted,
+                                  ) {
+                                    textEditingController.text =
+                                        _controladorFaseLunar.text;
+                                    textEditingController
+                                        .selection = TextSelection.fromPosition(
+                                      TextPosition(
+                                        offset:
+                                            textEditingController.text.length,
+                                      ),
+                                    );
+                                    return TextFormField(
+                                      controller: textEditingController,
+                                      focusNode: focusNode,
+                                      decoration: _construirDecoracionCampo(
+                                        'Fase Lunar (Ej: Luna Nueva)',
+                                        sufijo: const Icon(
+                                          FontAwesomeIcons.moon,
+                                          size: 18,
+                                          color: Color(0xFF1E3A8A),
+                                        ),
+                                      ),
+                                      validator: (valor) {
+                                        if (valor == null ||
+                                            valor.trim().isEmpty) {
+                                          return 'La fase lunar es obligatoria';
+                                        }
+                                        return null;
+                                      },
+                                      onChanged: (v) =>
+                                          _controladorFaseLunar.text = v,
+                                    );
+                                  },
                             ),
                           ),
                         ],
