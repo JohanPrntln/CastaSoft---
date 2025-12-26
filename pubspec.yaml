@@ -59,6 +59,8 @@ dependencies:
   
   # Dependencias para manejo de archivos y rutas
   path: ^1.8.2
+  firebase_core: ^4.3.0
+  firebase_auth: ^6.1.3
 
 dev_dependencies:
   flutter_test:

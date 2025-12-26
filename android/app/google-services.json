@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "759962794686",
+    "project_id": "castasoft-c6be3",
+    "storage_bucket": "castasoft-c6be3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:759962794686:android:037a2bb3340275a2ecbcef",
+        "android_client_info": {
+          "package_name": "com.example.castasoft"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCdE1B-ZODraNDuEZxIabN1h998-cB--ko"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

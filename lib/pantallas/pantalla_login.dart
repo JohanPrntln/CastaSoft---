@@ -64,7 +64,8 @@ class _PantallaLoginState extends State<PantallaLogin> {
       esValido = false;
     } else if (_controladorContrasena.text.length < 6) {
       setState(() {
-        _mensajeErrorContrasena = 'La contraseña debe tener al menos 6 caracteres';
+        _mensajeErrorContrasena =
+            'La contraseña debe tener al menos 6 caracteres';
       });
       esValido = false;
     }
@@ -264,16 +265,15 @@ class _PantallaLoginState extends State<PantallaLogin> {
         ),
         prefixIcon: Padding(
           padding: const EdgeInsets.only(left: 14, right: 10),
-          child: Icon(
-            FontAwesomeIcons.user,
-            size: 16,
-            color: _dorado,
-          ),
+          child: Icon(FontAwesomeIcons.user, size: 16, color: _dorado),
         ),
         prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
         filled: true,
         fillColor: _grisClaro,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 14,
+          horizontal: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -281,7 +281,9 @@ class _PantallaLoginState extends State<PantallaLogin> {
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-            color: _mensajeErrorUsuario != null ? Colors.red : Colors.transparent,
+            color: _mensajeErrorUsuario != null
+                ? Colors.red
+                : Colors.transparent,
             width: 1.5,
           ),
         ),
@@ -325,11 +327,7 @@ class _PantallaLoginState extends State<PantallaLogin> {
         ),
         prefixIcon: Padding(
           padding: const EdgeInsets.only(left: 14, right: 10),
-          child: Icon(
-            FontAwesomeIcons.lock,
-            size: 16,
-            color: _dorado,
-          ),
+          child: Icon(FontAwesomeIcons.lock, size: 16, color: _dorado),
         ),
         prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
         suffixIcon: GestureDetector(
@@ -351,7 +349,10 @@ class _PantallaLoginState extends State<PantallaLogin> {
         ),
         filled: true,
         fillColor: _grisClaro,
-        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 14,
+          horizontal: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -359,7 +360,9 @@ class _PantallaLoginState extends State<PantallaLogin> {
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(
-            color: _mensajeErrorContrasena != null ? Colors.red : Colors.transparent,
+            color: _mensajeErrorContrasena != null
+                ? Colors.red
+                : Colors.transparent,
             width: 1.5,
           ),
         ),

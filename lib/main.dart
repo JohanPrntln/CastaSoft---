@@ -4,17 +4,33 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:castasoft/pantallas/pantalla_inicio.dart';
 import 'package:castasoft/pantallas/pantalla_login.dart';
+import 'package:firebase_core/firebase_core.dart'; // Firebase core
+import 'firebase_options.dart'; // Generated Firebase options (FlutterFire)
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
 import 'package:castasoft/datos/ayudante_db.dart';
 
 /// Función principal de la aplicación CastaSoft
 /// Inicia la aplicación ejecutando la clase AplicacionCastaSoft
 void main() async {
+  // 1. Asegura que los widgets estén listos
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicializar la base de datos antes de ejecutar la aplicación
+  // 2. Inicializar Firebase (usa firebase_options.dart generado por FlutterFire CLI)
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    // Si la inicialización falla aquí, lo registramos y continuamos.
+    // En entornos de desarrollo sin firebase_options.dart esto puede lanzar.
+    // Mantener la app funcional mientras se corrige la configuración.
+    // print('Firebase initialize error: $e');
+  }
+
+  // 3. Inicializar la base de datos local antes de ejecutar la aplicación
   await AyudanteDB.instancia.inicializarDB();
 
+  // 4. Ejecutar la aplicación principal
   runApp(const AplicacionCastaSoft());
 }
 
