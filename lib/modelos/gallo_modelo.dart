@@ -7,8 +7,8 @@
 /// - Identificación única (id, placa)
 /// - Datos personales (nombre, sexo, fecha de nacimiento)
 /// - Genealogía (padre, madre, línea genética)
-/// - Características físicas (color de pluma)
-/// - Información adicional (fase lunar, estado, notas)
+/// - Características físicas (color de pluma, peso, jaula)
+/// - Información adicional (fase lunar, estado, notas, criadero de origen)
 ///
 /// Métodos para persistencia en base de datos:
 /// - toMap(): Serializa el objeto a formato compatible con SQLite
@@ -34,15 +34,19 @@ class Gallo {
   /// Se utiliza para calcular la edad
   final DateTime fechaNacimiento;
 
-  /// Identificador del padre del gallo
+  /// Identificador del padre del gallo (nuevo nombre: `padreId`)
   /// Opcional para mantener registro genealógico
   /// Permite null si se desconoce o no existe registro
-  final String? idPadre;
+  final String? padreId;
 
-  /// Identificador de la madre del gallo
+  /// Identificador de la madre del gallo (nuevo nombre: `madreId`)
   /// Opcional para mantener registro genealógico
   /// Permite null si se desconoce o no existe registro
-  final String? idMadre;
+  final String? madreId;
+
+  /// Compatibilidad: getters con nombres antiguos
+  String? get idPadre => padreId;
+  String? get idMadre => madreId;
 
   /// Línea genética del gallo
   /// Ejemplos: 'Kelso', 'Sweater', 'Blueface', 'Hatch'
@@ -65,7 +69,7 @@ class Gallo {
   final String? fotoPath;
 
   /// Estado actual del gallo
-  /// Valores permitidos: 'Activo', 'Vendido', 'Baja'
+  /// Valores permitidos: 'Activo', 'Vendido', 'Baja', 'Retirado'
   /// Determina si el gallo sigue activo en el sistema
   final String estado;
 
@@ -74,22 +78,20 @@ class Gallo {
   /// Permite null si no hay notas
   final String? notas;
 
+  /// Peso del gallo (puede estar en libras o kilos según la configuración)
+  final double? peso;
+
+  /// Identificador de la jaula o ubicación física
+  final String? jaula;
+
+  /// Criadero de origen. Por defecto 'Propio' cuando no se especifica
+  final String criaderoOrigen;
+
   /// Constructor de la clase Gallo
   ///
-  /// Parámetros:
-  /// - [id] - Identificador único (obligatorio)
-  /// - [placa] - Número de anillo (obligatorio)
-  /// - [nombre] - Nombre del gallo (obligatorio)
-  /// - [sexo] - Sexo del gallo (obligatorio)
-  /// - [fechaNacimiento] - Fecha de nacimiento (obligatorio)
-  /// - [lineaGenetica] - Línea genética (obligatorio)
-  /// - [colorPluma] - Color de pluma (obligatorio)
-  /// - [faseLunar] - Fase lunar de nacimiento (obligatorio)
-  /// - [estado] - Estado del gallo (obligatorio)
-  /// - [idPadre] - ID del padre (opcional)
-  /// - [idMadre] - ID de la madre (opcional)
-  /// - [fotoPath] - Ruta de la foto (opcional)
-  /// - [notas] - Notas adicionales (opcional)
+  /// Nota: por compatibilidad con el código existente se aceptan los
+  /// parámetros nombrados `idPadre` y `idMadre` en el constructor, pero
+  /// internamente se almacenan en `padreId`/`madreId`.
   const Gallo({
     required this.id,
     required this.placa,
@@ -100,11 +102,15 @@ class Gallo {
     required this.colorPluma,
     required this.faseLunar,
     required this.estado,
-    this.idPadre,
-    this.idMadre,
+    String? idPadre,
+    String? idMadre,
     this.fotoPath,
     this.notas,
-  });
+    this.peso,
+    this.jaula,
+    this.criaderoOrigen = 'Propio',
+  }) : padreId = idPadre,
+       madreId = idMadre;
 
   /// Convierte el objeto Gallo a un mapa para almacenamiento en SQLite
   ///
@@ -123,14 +129,20 @@ class Gallo {
       'nombre': nombre,
       'sexo': sexo,
       'fechaNacimiento': fechaNacimiento.toIso8601String(),
-      'idPadre': idPadre,
-      'idMadre': idMadre,
+      // Guardar ambos nombres de campo para compatibilidad con esquemas
+      'padreId': padreId,
+      'idPadre': padreId,
+      'madreId': madreId,
+      'idMadre': madreId,
       'lineaGenetica': lineaGenetica,
       'colorPluma': colorPluma,
       'faseLunar': faseLunar,
       'fotoPath': fotoPath,
       'estado': estado,
       'notas': notas,
+      'peso': peso,
+      'jaula': jaula,
+      'criaderoOrigen': criaderoOrigen,
     };
   }
 
@@ -154,14 +166,18 @@ class Gallo {
       nombre: mapa['nombre'] as String,
       sexo: mapa['sexo'] as String,
       fechaNacimiento: DateTime.parse(mapa['fechaNacimiento'] as String),
-      idPadre: mapa['idPadre'] as String?,
-      idMadre: mapa['idMadre'] as String?,
+      // Compatibilidad: leer el nuevo campo 'padreId' si existe, sino 'idPadre'
+      idPadre: (mapa['padreId'] ?? mapa['idPadre']) as String?,
+      idMadre: (mapa['madreId'] ?? mapa['idMadre']) as String?,
       lineaGenetica: mapa['lineaGenetica'] as String,
       colorPluma: mapa['colorPluma'] as String,
       faseLunar: mapa['faseLunar'] as String,
       fotoPath: mapa['fotoPath'] as String?,
       estado: mapa['estado'] as String,
       notas: mapa['notas'] as String?,
+      peso: mapa['peso'] == null ? null : (mapa['peso'] as num).toDouble(),
+      jaula: mapa['jaula'] as String?,
+      criaderoOrigen: (mapa['criaderoOrigen'] as String?) ?? 'Propio',
     );
   }
 
@@ -171,7 +187,8 @@ class Gallo {
   String toString() {
     return 'Gallo(id: $id, placa: $placa, nombre: $nombre, sexo: $sexo, '
         'fechaNacimiento: $fechaNacimiento, lineaGenetica: $lineaGenetica, '
-        'colorPluma: $colorPluma, estado: $estado)';
+        'colorPluma: $colorPluma, estado: $estado, padreId: $padreId, madreId: $madreId, '
+        'peso: $peso, jaula: $jaula, criaderoOrigen: $criaderoOrigen)';
   }
 
   /// Método de igualdad para comparar dos objetos Gallo

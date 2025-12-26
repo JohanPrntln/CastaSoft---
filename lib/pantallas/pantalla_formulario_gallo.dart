@@ -43,11 +43,16 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
   late TextEditingController _controladorFaseLunar;
   late TextEditingController _controladorNotas;
   late TextEditingController _controladorFechaNacimiento;
+  late TextEditingController _controladorPeso;
+  late TextEditingController _controladorJaula;
+  late TextEditingController _controladorCriaderoOrigen;
 
   /// Variables para almacenar selecciones
   String? _sexoSeleccionado;
   String? _estadoSeleccionado;
   DateTime? _fechaNacimientoSeleccionada;
+  String? _padreIdSeleccionado;
+  String? _madreIdSeleccionado;
 
   /// Ruta temporal de la fotografía seleccionada
   String? _rutaFotoTemporal;
@@ -70,6 +75,9 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
     _controladorFaseLunar = TextEditingController();
     _controladorNotas = TextEditingController();
     _controladorFechaNacimiento = TextEditingController();
+    _controladorPeso = TextEditingController();
+    _controladorJaula = TextEditingController();
+    _controladorCriaderoOrigen = TextEditingController();
 
     // Si hay gallo para editar, llenar los campos
     if (widget.galloEditar != null) {
@@ -83,6 +91,13 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
       _controladorFaseLunar.text = gallo.faseLunar;
       _controladorNotas.text = gallo.notas ?? '';
       _controladorFechaNacimiento.text = _formatearFecha(gallo.fechaNacimiento);
+
+      _controladorPeso.text = gallo.peso?.toString() ?? '';
+      _controladorJaula.text = gallo.jaula ?? '';
+      _controladorCriaderoOrigen.text = gallo.criaderoOrigen;
+
+      _padreIdSeleccionado = gallo.padreId ?? gallo.idPadre;
+      _madreIdSeleccionado = gallo.madreId ?? gallo.idMadre;
 
       _sexoSeleccionado = gallo.sexo;
       _estadoSeleccionado = gallo.estado;
@@ -105,6 +120,9 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
     _controladorFaseLunar.dispose();
     _controladorNotas.dispose();
     _controladorFechaNacimiento.dispose();
+    _controladorPeso.dispose();
+    _controladorJaula.dispose();
+    _controladorCriaderoOrigen.dispose();
     super.dispose();
   }
 
@@ -252,6 +270,26 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
 
       if (_esEdicion) {
         // Editar gallo existente
+        final padreIdVal =
+            _padreIdSeleccionado ??
+            widget.galloEditar!.padreId ??
+            widget.galloEditar!.idPadre;
+        final madreIdVal =
+            _madreIdSeleccionado ??
+            widget.galloEditar!.madreId ??
+            widget.galloEditar!.idMadre;
+        final pesoVal = _controladorPeso.text.trim().isEmpty
+            ? null
+            : double.tryParse(
+                _controladorPeso.text.trim().replaceAll(',', '.'),
+              );
+        final jaulaVal = _controladorJaula.text.trim().isEmpty
+            ? null
+            : _controladorJaula.text.trim();
+        final criaderoVal = _controladorCriaderoOrigen.text.trim().isEmpty
+            ? 'Propio'
+            : _controladorCriaderoOrigen.text.trim();
+
         final galloEditado = Gallo(
           id: widget.galloEditar!.id,
           placa: _controladorPlaca.text.trim(),
@@ -266,8 +304,11 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
           notas: _controladorNotas.text.trim().isEmpty
               ? null
               : _controladorNotas.text.trim(),
-          idPadre: widget.galloEditar!.idPadre,
-          idMadre: widget.galloEditar!.idMadre,
+          idPadre: padreIdVal,
+          idMadre: madreIdVal,
+          peso: pesoVal,
+          jaula: jaulaVal,
+          criaderoOrigen: criaderoVal,
         );
 
         try {
@@ -297,6 +338,20 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
       } else {
         // Crear nuevo gallo
         const generadorUUID = Uuid();
+        final padreIdVal = _padreIdSeleccionado;
+        final madreIdVal = _madreIdSeleccionado;
+        final pesoVal = _controladorPeso.text.trim().isEmpty
+            ? null
+            : double.tryParse(
+                _controladorPeso.text.trim().replaceAll(',', '.'),
+              );
+        final jaulaVal = _controladorJaula.text.trim().isEmpty
+            ? null
+            : _controladorJaula.text.trim();
+        final criaderoVal = _controladorCriaderoOrigen.text.trim().isEmpty
+            ? 'Propio'
+            : _controladorCriaderoOrigen.text.trim();
+
         final nuevoGallo = Gallo(
           id: generadorUUID.v4(),
           placa: _controladorPlaca.text.trim(),
@@ -311,6 +366,11 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
           notas: _controladorNotas.text.trim().isEmpty
               ? null
               : _controladorNotas.text.trim(),
+          idPadre: padreIdVal,
+          idMadre: madreIdVal,
+          peso: pesoVal,
+          jaula: jaulaVal,
+          criaderoOrigen: criaderoVal,
         );
 
         try {
@@ -349,18 +409,50 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
 
   @override
   Widget build(BuildContext context) {
-    final esDesktop = MediaQuery.of(context).size.width > 800;
+    // final esDesktop = MediaQuery.of(context).size.width > 800; // reservado para ajustes responsivos futuros
+
+    // Preparación de datos: obtener lista completa de gallos y candidatos para padres/madres
+    final todosLosGallos = context.read<GallosProveedor>().gallos;
+    final currentId = widget.galloEditar?.id;
+    final candidatosPadres = todosLosGallos
+        .where((g) => g.sexo == 'Macho' && g.id != currentId)
+        .toList();
+    final candidatosMadres = todosLosGallos
+        .where((g) => g.sexo == 'Hembra' && g.id != currentId)
+        .toList();
+
+    const kLineasGeneticas = [
+      'Kelso',
+      'Sweater',
+      'Radio',
+      'Hatch',
+      'Giro',
+      'Brown Red',
+      'Asil',
+      'Albany',
+      'Roundhead',
+      'Español',
+    ];
+    const List<String> kColoresPluma = [
+      'Giro',
+      'Colorado',
+      'Cenizo',
+      'Jabao',
+      'Pinto',
+      'Marañón',
+      'Ajiseco',
+      'Negro',
+      'Blanco',
+      'Miel',
+    ];
 
     return Scaffold(
-      /// AppBar con título dinámico
       appBar: AppBar(
         title: Text(
           _esEdicion ? 'Editar ${widget.galloEditar!.nombre}' : 'Nuevo Gallo',
         ),
         backgroundColor: const Color(0xFF1E3A8A),
       ),
-
-      /// Cuerpo del formulario
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(32),
         child: Form(
@@ -536,7 +628,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
               /// ==================== TARJETA 2: CARACTERÍSTICAS ====================
               Card(
@@ -589,17 +681,63 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
                           ),
                           const SizedBox(width: 20),
                           Expanded(
-                            child: TextFormField(
-                              controller: _controladorColorPluma,
-                              decoration: _construirDecoracionCampo(
-                                'Color de Pluma',
+                            child: Autocomplete<String>(
+                              initialValue: TextEditingValue(
+                                text: _controladorColorPluma.text,
                               ),
-                              validator: (valor) {
-                                if (valor == null || valor.trim().isEmpty) {
-                                  return 'Ingresa el color';
-                                }
-                                return null;
+                              optionsBuilder:
+                                  (TextEditingValue textEditingValue) {
+                                    if (textEditingValue.text.isEmpty)
+                                      return kColoresPluma;
+                                    return kColoresPluma.where(
+                                      (c) => c.toLowerCase().contains(
+                                        textEditingValue.text.toLowerCase(),
+                                      ),
+                                    );
+                                  },
+                              onSelected: (selection) {
+                                setState(() {
+                                  _controladorColorPluma.text = selection;
+                                });
                               },
+                              fieldViewBuilder:
+                                  (
+                                    context,
+                                    textEditingController,
+                                    focusNode,
+                                    onFieldSubmitted,
+                                  ) {
+                                    textEditingController.text =
+                                        _controladorColorPluma.text;
+                                    textEditingController
+                                        .selection = TextSelection.fromPosition(
+                                      TextPosition(
+                                        offset:
+                                            textEditingController.text.length,
+                                      ),
+                                    );
+                                    return TextFormField(
+                                      controller: textEditingController,
+                                      focusNode: focusNode,
+                                      decoration: _construirDecoracionCampo(
+                                        'Color de Pluma',
+                                        sufijo: const Icon(
+                                          FontAwesomeIcons.palette,
+                                          size: 18,
+                                          color: Color(0xFF1E3A8A),
+                                        ),
+                                      ),
+                                      validator: (valor) {
+                                        if (valor == null ||
+                                            valor.trim().isEmpty) {
+                                          return 'Ingresa el color';
+                                        }
+                                        return null;
+                                      },
+                                      onChanged: (v) =>
+                                          _controladorColorPluma.text = v,
+                                    );
+                                  },
                             ),
                           ),
                           const SizedBox(width: 20),
@@ -637,23 +775,177 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
                         ],
                       ),
                       const SizedBox(height: 20),
-                      TextFormField(
-                        controller: _controladorLineaGenetica,
-                        decoration: _construirDecoracionCampo(
-                          'Línea Genética (Ej: Kelso, Sweater)',
+                      Autocomplete<String>(
+                        initialValue: TextEditingValue(
+                          text: _controladorLineaGenetica.text,
                         ),
-                        validator: (valor) {
-                          if (valor == null || valor.trim().isEmpty) {
-                            return 'La línea genética es obligatoria';
+                        optionsBuilder: (TextEditingValue textEditingValue) {
+                          if (textEditingValue.text.isEmpty) {
+                            return kLineasGeneticas;
                           }
-                          return null;
+                          return kLineasGeneticas.where(
+                            (op) => op.toLowerCase().contains(
+                              textEditingValue.text.toLowerCase(),
+                            ),
+                          );
                         },
+                        onSelected: (selection) {
+                          setState(() {
+                            _controladorLineaGenetica.text = selection;
+                          });
+                        },
+                        fieldViewBuilder:
+                            (
+                              context,
+                              textEditingController,
+                              focusNode,
+                              onFieldSubmitted,
+                            ) {
+                              // Mantener sincronía con nuestro controlador principal
+                              textEditingController.text =
+                                  _controladorLineaGenetica.text;
+                              textEditingController.selection =
+                                  TextSelection.fromPosition(
+                                    TextPosition(
+                                      offset: textEditingController.text.length,
+                                    ),
+                                  );
+                              return TextFormField(
+                                controller: textEditingController,
+                                focusNode: focusNode,
+                                decoration: _construirDecoracionCampo(
+                                  'Línea Genética (Ej: Kelso, Sweater)',
+                                  sufijo: const Icon(
+                                    FontAwesomeIcons.dna,
+                                    size: 18,
+                                    color: Color(0xFF1E3A8A),
+                                  ),
+                                ),
+                                validator: (valor) {
+                                  if (valor == null || valor.trim().isEmpty) {
+                                    return 'La línea genética es obligatoria';
+                                  }
+                                  return null;
+                                },
+                                onChanged: (v) =>
+                                    _controladorLineaGenetica.text = v,
+                              );
+                            },
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+
+              /// ==================== TARJETA 3: GENEALOGÍA ====================
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Genealogía',
+                        style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF1E3A8A),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: candidatosPadres.isEmpty
+                                ? DropdownButtonFormField<String>(
+                                    value: null,
+                                    decoration: _construirDecoracionCampo(
+                                      'Padre (Macho)',
+                                    ),
+                                    items: const [
+                                      DropdownMenuItem(
+                                        value: null,
+                                        child: Text(
+                                          'No hay machos registrados',
+                                        ),
+                                      ),
+                                    ],
+                                    onChanged: null,
+                                  )
+                                : DropdownButtonFormField<String>(
+                                    value: _padreIdSeleccionado,
+                                    decoration: _construirDecoracionCampo(
+                                      'Padre (Macho)',
+                                    ),
+                                    items: candidatosPadres
+                                        .map(
+                                          (g) => DropdownMenuItem(
+                                            value: g.id,
+                                            child: Text(
+                                              '${g.nombre} (${g.placa})',
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: (valor) {
+                                      setState(() {
+                                        _padreIdSeleccionado = valor;
+                                      });
+                                    },
+                                  ),
+                          ),
+                          const SizedBox(width: 20),
+                          Expanded(
+                            child: candidatosMadres.isEmpty
+                                ? DropdownButtonFormField<String>(
+                                    value: null,
+                                    decoration: _construirDecoracionCampo(
+                                      'Madre (Hembra)',
+                                    ),
+                                    items: const [
+                                      DropdownMenuItem(
+                                        value: null,
+                                        child: Text(
+                                          'No hay hembras registradas',
+                                        ),
+                                      ),
+                                    ],
+                                    onChanged: null,
+                                  )
+                                : DropdownButtonFormField<String>(
+                                    value: _madreIdSeleccionado,
+                                    decoration: _construirDecoracionCampo(
+                                      'Madre (Hembra)',
+                                    ),
+                                    items: candidatosMadres
+                                        .map(
+                                          (g) => DropdownMenuItem(
+                                            value: g.id,
+                                            child: Text(
+                                              '${g.nombre} (${g.placa})',
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: (valor) {
+                                      setState(() {
+                                        _madreIdSeleccionado = valor;
+                                      });
+                                    },
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
 
               /// ==================== TARJETA 3: ORIGEN ====================
               Card(
@@ -714,11 +1006,54 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _controladorPeso,
+                              keyboardType: TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              decoration: _construirDecoracionCampo(
+                                'Peso',
+                                sufijo: const Text('Kg'),
+                              ),
+                              validator: (valor) {
+                                if (valor != null && valor.trim().isNotEmpty) {
+                                  final parsed = double.tryParse(
+                                    valor.replaceAll(',', '.'),
+                                  );
+                                  if (parsed == null)
+                                    return 'Ingresa un número válido';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _controladorJaula,
+                              decoration: _construirDecoracionCampo('Jaula'),
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _controladorCriaderoOrigen,
+                              decoration: _construirDecoracionCampo(
+                                'Criadero Origen',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
               /// ==================== CAMPO DE NOTAS ====================
               TextFormField(
