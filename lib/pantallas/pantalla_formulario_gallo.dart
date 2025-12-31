@@ -1,11 +1,10 @@
+import 'dart:convert'; // Para Base64
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
@@ -22,40 +21,35 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   final _claveFormulario = GlobalKey<FormState>();
   late TabController _tabController;
 
-  // ================== CONTROLADORES DE TEXTO ==================
-  // 1. Datos Básicos
-  late TextEditingController _ctrlPlaca;
-  late TextEditingController _ctrlNombre;
-  late TextEditingController _ctrlLinea;
-  late TextEditingController _ctrlColor;
-  late TextEditingController _ctrlFase;
-  late TextEditingController _ctrlFecha;
+  // ================== CONTROLADORES ==================
+  final TextEditingController _ctrlPlaca = TextEditingController();
+  final TextEditingController _ctrlNombre = TextEditingController();
+  final TextEditingController _ctrlLinea = TextEditingController();
+  final TextEditingController _ctrlColor = TextEditingController();
+  final TextEditingController _ctrlFase = TextEditingController();
+  final TextEditingController _ctrlFecha = TextEditingController();
   
-  // 2. Gestión y Salud
-  late TextEditingController _ctrlPesoActual;
-  late TextEditingController _ctrlPesoCombate;
-  late TextEditingController _ctrlJaula;
-  late TextEditingController _ctrlCriadero;
+  final TextEditingController _ctrlPesoActual = TextEditingController();
+  final TextEditingController _ctrlPesoCombate = TextEditingController();
+  final TextEditingController _ctrlJaula = TextEditingController();
+  final TextEditingController _ctrlCriadero = TextEditingController();
   
-  // 3. Genealogía Visual (Nombres texto)
-  late TextEditingController _ctrlNombrePadre;
-  late TextEditingController _ctrlNombreMadre;
-  late TextEditingController _ctrlAbueloPaterno;
-  late TextEditingController _ctrlAbuelaPaterna;
-  late TextEditingController _ctrlAbueloMaterno;
-  late TextEditingController _ctrlAbuelaMaterna;
+  final TextEditingController _ctrlNombrePadre = TextEditingController();
+  final TextEditingController _ctrlNombreMadre = TextEditingController();
+  final TextEditingController _ctrlAbueloPaterno = TextEditingController();
+  final TextEditingController _ctrlAbuelaPaterna = TextEditingController();
+  final TextEditingController _ctrlAbueloMaterno = TextEditingController();
+  final TextEditingController _ctrlAbuelaMaterna = TextEditingController();
 
-  // 4. Finanzas y Extras
-  late TextEditingController _ctrlCosto;
-  late TextEditingController _ctrlVenta;
-  late TextEditingController _ctrlVideo;
-  late TextEditingController _ctrlNotas;
+  final TextEditingController _ctrlCosto = TextEditingController();
+  final TextEditingController _ctrlVenta = TextEditingController();
+  final TextEditingController _ctrlVideo = TextEditingController();
+  final TextEditingController _ctrlNotas = TextEditingController();
 
-  // Controladores auxiliares para listas
   final TextEditingController _ctrlNuevaVacuna = TextEditingController();
   final TextEditingController _ctrlNuevaPelea = TextEditingController();
 
-  // ================== VARIABLES DE ESTADO ==================
+  // ================== VARIABLES ==================
   String? _sexo;
   String? _estado;
   String? _etapaVida;
@@ -63,52 +57,29 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   DateTime? _fechaNacimiento;
   String? _padreId;
   String? _madreId;
-  String? _rutaFoto;
+  
+  bool _esEdicion = false;
+  
+  // Variables FOTO
+  File? _imagenNuevaSeleccionada; 
+  String? _fotoActualBase64; 
 
-  // Listas dinámicas
   List<String> _listaVacunas = [];
   List<String> _listaPeleas = [];
 
   final ImagePicker _picker = ImagePicker();
-  bool _esEdicion = false;
+  bool _estaGuardando = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    _inicializarControladores();
     
     if (widget.galloEditar != null) {
       _cargarDatosExistentes(widget.galloEditar!);
     } else {
       _valoresPorDefecto();
     }
-  }
-
-  void _inicializarControladores() {
-    _ctrlPlaca = TextEditingController();
-    _ctrlNombre = TextEditingController();
-    _ctrlLinea = TextEditingController();
-    _ctrlColor = TextEditingController();
-    _ctrlFase = TextEditingController();
-    _ctrlFecha = TextEditingController();
-    
-    _ctrlPesoActual = TextEditingController();
-    _ctrlPesoCombate = TextEditingController();
-    _ctrlJaula = TextEditingController();
-    _ctrlCriadero = TextEditingController();
-
-    _ctrlNombrePadre = TextEditingController();
-    _ctrlNombreMadre = TextEditingController();
-    _ctrlAbueloPaterno = TextEditingController();
-    _ctrlAbuelaPaterna = TextEditingController();
-    _ctrlAbueloMaterno = TextEditingController();
-    _ctrlAbuelaMaterna = TextEditingController();
-
-    _ctrlCosto = TextEditingController();
-    _ctrlVenta = TextEditingController();
-    _ctrlVideo = TextEditingController();
-    _ctrlNotas = TextEditingController();
   }
 
   void _cargarDatosExistentes(Gallo g) {
@@ -125,7 +96,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     _ctrlJaula.text = g.jaula ?? '';
     _ctrlCriadero.text = g.criaderoOrigen;
 
-    // Genealogía Visual
+    // Genealogía texto
     _ctrlNombrePadre.text = g.nombrePadre ?? '';
     _ctrlNombreMadre.text = g.nombreMadre ?? '';
     _ctrlAbueloPaterno.text = g.nombreAbueloPaterno ?? '';
@@ -133,17 +104,14 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     _ctrlAbueloMaterno.text = g.nombreAbueloMaterno ?? '';
     _ctrlAbuelaMaterna.text = g.nombreAbuelaMaterna ?? '';
 
-    // Finanzas
     _ctrlCosto.text = g.costoAdquisicion?.toString() ?? '';
     _ctrlVenta.text = g.precioVenta?.toString() ?? '';
     _ctrlVideo.text = g.videoUrl ?? '';
     _ctrlNotas.text = g.notas ?? '';
 
-    // Listas
     _listaVacunas = List.from(g.vacunas);
     _listaPeleas = List.from(g.peleas);
 
-    // Dropdowns y Variables
     _sexo = g.sexo;
     _estado = g.estado;
     _etapaVida = g.etapaVida;
@@ -151,7 +119,9 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     _fechaNacimiento = g.fechaNacimiento;
     _padreId = g.padreId;
     _madreId = g.madreId;
-    _rutaFoto = g.fotoPath;
+    
+    // FOTO: Guardamos el string base64 si existe
+    _fotoActualBase64 = g.fotoPath;
   }
 
   void _valoresPorDefecto() {
@@ -176,39 +146,35 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     super.dispose();
   }
 
-  // ================== LÓGICA DE NEGOCIO ==================
-
   String _formatearFecha(DateTime fecha) => '${fecha.day}/${fecha.month}/${fecha.year}';
 
+  // --- SELECCIONAR FOTO (COMPRIMIDA) ---
   Future<void> _seleccionarImagen() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
-    if (image != null) setState(() => _rutaFoto = image.path);
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 30, // Calidad 30%
+      maxWidth: 800,    // Ancho máx 800px
+    );
+    
+    if (image != null) {
+      setState(() {
+        _imagenNuevaSeleccionada = File(image.path);
+      });
+    }
   }
 
-  /// Función para limpiar números (quita puntos de miles y arregla decimales)
-  /// Entra: "5.000.000" -> Sale: 5000000.0
-  /// Entra: "600,50" -> Sale: 600.5
-  /// Función INTELIGENTE para limpiar números
-  /// [esDinero] = true  -> Borra puntos de miles (1.000 -> 1000)
-  /// [esDinero] = false -> Respeta el punto como decimal (2.5 -> 2.5)
   double? _limpiarNumero(String valor, {bool esDinero = false}) {
     if (valor.trim().isEmpty) return null;
     String limpio = valor.trim();
-    
     if (esDinero) {
-      // Lógica para Precios (Colombia): Quitamos puntos de mil
-      limpio = limpio.replaceAll('.', '');
-      // Cambiamos coma por punto por si acaso
-      limpio = limpio.replaceAll(',', '.');
+      limpio = limpio.replaceAll('.', '').replaceAll(',', '.');
     } else {
-      // Lógica para Pesos: Solo aseguramos que la coma sea punto
       limpio = limpio.replaceAll(',', '.');
-      // ¡NO quitamos los puntos aquí!
     }
-    
     return double.tryParse(limpio);
   }
   
+  // --- GUARDAR (LÓGICA CORREGIDA) ---
   Future<void> _guardar() async {
     if (_fechaNacimiento == null) {
       _mostrarSnack('Selecciona fecha de nacimiento', Colors.red);
@@ -216,24 +182,26 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     }
     if (!_claveFormulario.currentState!.validate()) return;
 
+    setState(() => _estaGuardando = true);
+
     try {
       final proveedor = context.read<GallosProveedor>();
       
-      // Manejo de imagen local (copiar a carpeta segura)
-      String? rutaFinal = _rutaFoto;
-      if (_rutaFoto != null && _rutaFoto != widget.galloEditar?.fotoPath) {
-        final directorio = await getApplicationSupportDirectory();
-        final carpeta = Directory(path.join(directorio.path, 'imagenes_gallos'));
-        if (!await carpeta.exists()) await carpeta.create(recursive: true);
-        final nuevoNombre = '${const Uuid().v4()}${path.extension(_rutaFoto!)}';
-        final rutaDestino = path.join(carpeta.path, nuevoNombre);
-        await File(_rutaFoto!).copy(rutaDestino);
-        rutaFinal = rutaDestino;
+      String? fotoFinalString;
+
+      // Si seleccionó foto nueva, convertimos a Base64
+      if (_imagenNuevaSeleccionada != null) {
+        final bytes = await _imagenNuevaSeleccionada!.readAsBytes();
+        fotoFinalString = 'base64,${base64Encode(bytes)}';
+      } else {
+        // Si no, dejamos la que estaba
+        fotoFinalString = widget.galloEditar?.fotoPath;
       }
 
       final gallo = Gallo(
         id: _esEdicion ? widget.galloEditar!.id : const Uuid().v4(),
         userId: _esEdicion ? widget.galloEditar!.userId : null,
+        
         placa: _ctrlPlaca.text.trim(),
         nombre: _ctrlNombre.text.trim(),
         sexo: _sexo!,
@@ -247,21 +215,15 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         criaderoOrigen: _ctrlCriadero.text.trim().isEmpty ? 'Propio' : _ctrlCriadero.text.trim(),
         jaula: _ctrlJaula.text.isEmpty ? null : _ctrlJaula.text.trim(),
         
-        // === AQUÍ USAMOS LA LIMPIEZA ===
-        
-        // PESOS (esDinero: false -> Respeta el 2.8)
         pesoActual: _limpiarNumero(_ctrlPesoActual.text, esDinero: false),
         pesoCombate: _limpiarNumero(_ctrlPesoCombate.text, esDinero: false),
-        
-        // DINERO (esDinero: true -> Convierte 5.000.000 en 5000000)
         costoAdquisicion: _limpiarNumero(_ctrlCosto.text, esDinero: true),
         precioVenta: _limpiarNumero(_ctrlVenta.text, esDinero: true),
-        // ===============================
-
+        
         notas: _ctrlNotas.text.isEmpty ? null : _ctrlNotas.text.trim(),
-        fotoPath: rutaFinal,
+        fotoPath: fotoFinalString, // FOTO TEXTO
         videoUrl: _ctrlVideo.text.isEmpty ? null : _ctrlVideo.text.trim(),
-        // Genealogía
+        
         padreId: _padreId,
         madreId: _madreId,
         nombrePadre: _ctrlNombrePadre.text.isEmpty ? null : _ctrlNombrePadre.text,
@@ -270,11 +232,12 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         nombreAbuelaPaterna: _ctrlAbuelaPaterna.text.isEmpty ? null : _ctrlAbuelaPaterna.text,
         nombreAbueloMaterno: _ctrlAbueloMaterno.text.isEmpty ? null : _ctrlAbueloMaterno.text,
         nombreAbuelaMaterna: _ctrlAbuelaMaterna.text.isEmpty ? null : _ctrlAbuelaMaterna.text,
-        // Listas
+        
         vacunas: _listaVacunas,
         peleas: _listaPeleas,
       );
 
+      // CORRECCIÓN AQUÍ: Usamos crear o actualizar según corresponda
       if (_esEdicion) {
         await proveedor.actualizarGallo(gallo);
         _mostrarSnack('Gallo actualizado correctamente', Colors.green);
@@ -282,10 +245,13 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         await proveedor.crearGallo(gallo);
         _mostrarSnack('Gallo creado correctamente', Colors.green);
       }
+      
       if (mounted) Navigator.pop(context);
 
     } catch (e) {
       _mostrarSnack('Error: $e', Colors.red);
+    } finally {
+      if (mounted) setState(() => _estaGuardando = false);
     }
   }
 
@@ -293,7 +259,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msj), backgroundColor: color));
   }
 
-  // ================== INTERFAZ GRÁFICA (UI) ==================
+  // ================== VISTA PRINCIPAL ==================
 
   @override
   Widget build(BuildContext context) {
@@ -315,20 +281,22 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
           ],
         ),
       ),
-      body: Form(
-        key: _claveFormulario,
-        child: TabBarView(
-          controller: _tabController,
-          children: [
-            _buildTabDatos(),      // Pestaña 1
-            _buildTabGenealogia(), // Pestaña 2
-            _buildTabGestion(),    // Pestaña 3
-            _buildTabFinanzas(),   // Pestaña 4
-          ],
-        ),
-      ),
+      body: _estaGuardando 
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)))
+          : Form(
+              key: _claveFormulario,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildTabDatos(),      // LLAMADA A FUNCIÓN
+                  _buildTabGenealogia(), // LLAMADA A FUNCIÓN
+                  _buildTabGestion(),    // LLAMADA A FUNCIÓN
+                  _buildTabFinanzas(),   // LLAMADA A FUNCIÓN
+                ],
+              ),
+            ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _guardar,
+        onPressed: _estaGuardando ? null : _guardar,
         backgroundColor: const Color(0xFFD4AF37),
         icon: const Icon(Icons.save),
         label: const Text('GUARDAR'),
@@ -336,7 +304,48 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     );
   }
 
-  // === PESTAÑA 1: DATOS BÁSICOS ===
+  // ================== PESTAÑAS Y WIDGETS ==================
+
+  // FOTO PICKER INTELIGENTE
+  Widget _buildFotoPicker() {
+    ImageProvider? imagenMostrar;
+
+    // 1. Si hay foto nueva seleccionada
+    if (_imagenNuevaSeleccionada != null) {
+      imagenMostrar = FileImage(_imagenNuevaSeleccionada!);
+    } 
+    // 2. Si hay foto antigua en Base64
+    else if (_fotoActualBase64 != null && _fotoActualBase64!.startsWith('base64,')) {
+      try {
+        final String base64String = _fotoActualBase64!.split(',').last;
+        imagenMostrar = MemoryImage(base64Decode(base64String));
+      } catch (e) {
+        print('Error imagen: $e');
+      }
+    }
+
+    return Center(
+      child: GestureDetector(
+        onTap: _seleccionarImagen,
+        child: Container(
+          width: 150, height: 150,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: Colors.grey.shade300),
+            image: imagenMostrar != null 
+                ? DecorationImage(image: imagenMostrar, fit: BoxFit.cover) 
+                : null,
+          ),
+          child: imagenMostrar == null 
+              ? const Icon(Icons.add_a_photo, size: 50, color: Color(0xFF1E3A8A)) 
+              : null,
+        ),
+      ),
+    );
+  }
+
+  // PESTAÑA 1
   Widget _buildTabDatos() {
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -370,41 +379,37 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
             Expanded(child: _buildInput(_ctrlFase, 'Fase Lunar', icon: FontAwesomeIcons.moon, validacion: true)),
           ]),
         ]),
-        const SizedBox(height: 60), // Espacio para el botón flotante
+        const SizedBox(height: 60), 
       ],
     );
   }
 
-  // === PESTAÑA 2: GENEALOGÍA ===
+  // PESTAÑA 2
   Widget _buildTabGenealogia() {
-    final gallos = context.read<GallosProveedor>().gallos;
+    final gallos = context.watch<GallosProveedor>().gallos; // Usamos watch para actualizar si cambia
     final padres = gallos.where((g) => g.sexo == 'Macho' && g.id != widget.galloEditar?.id).toList();
     final madres = gallos.where((g) => g.sexo == 'Hembra' && g.id != widget.galloEditar?.id).toList();
 
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        _buildCard('Padres en el Sistema (IDs)', [
-          const Text('Vincular con gallos ya registrados:', style: TextStyle(color: Colors.grey)),
-          const SizedBox(height: 10),
+        _buildCard('Padres en el Sistema', [
           DropdownButtonFormField<String>(
             value: _padreId,
             items: padres.map((g) => DropdownMenuItem(value: g.id, child: Text('${g.nombre} (${g.placa})'))).toList(),
             onChanged: (v) => setState(() => _padreId = v),
-            decoration: _inputDeco('Padre (Macho Registrado)'),
+            decoration: _inputDeco('Padre (Macho)'),
           ),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
             value: _madreId,
             items: madres.map((g) => DropdownMenuItem(value: g.id, child: Text('${g.nombre} (${g.placa})'))).toList(),
             onChanged: (v) => setState(() => _madreId = v),
-            decoration: _inputDeco('Madre (Hembra Registrada)'),
+            decoration: _inputDeco('Madre (Hembra)'),
           ),
         ]),
         const SizedBox(height: 20),
-        _buildCard('Árbol Genealógico Visual (PDF)', [
-          const Text('Nombres para mostrar en el PDF (si no están registrados):', style: TextStyle(color: Colors.grey)),
-          const SizedBox(height: 15),
+        _buildCard('Árbol Genealógico Texto', [
           _buildInput(_ctrlNombrePadre, 'Nombre del Padre'),
           const SizedBox(height: 10),
           Row(children: [
@@ -412,7 +417,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
             const SizedBox(width: 10),
             Expanded(child: _buildInput(_ctrlAbuelaPaterna, 'Abuela Paterna')),
           ]),
-          const Divider(height: 30),
+          const Divider(height: 20),
           _buildInput(_ctrlNombreMadre, 'Nombre de la Madre'),
           const SizedBox(height: 10),
           Row(children: [
@@ -426,7 +431,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     );
   }
 
-  // === PESTAÑA 3: GESTIÓN Y SALUD ===
+  // PESTAÑA 3
   Widget _buildTabGestion() {
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -439,30 +444,27 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
           ]),
           const SizedBox(height: 15),
           Row(children: [
-            // Peso Actual
             Expanded(child: _buildInput(_ctrlPesoActual, 'Peso Actual (Kg)', isNumber: true, icon: FontAwesomeIcons.weightScale)),
             const SizedBox(width: 15),
-            // Peso Combate (¡NUEVO!)
-            Expanded(child: _buildInput(_ctrlPesoCombate, 'Peso Pactado/Combate', isNumber: true, icon: FontAwesomeIcons.dumbbell)),
+            Expanded(child: _buildInput(_ctrlPesoCombate, 'Peso Pactado', isNumber: true, icon: FontAwesomeIcons.dumbbell)),
           ]),
           const SizedBox(height: 15),
           _buildInput(_ctrlJaula, 'Jaula / Ubicación'),
-          
         ]),
         const SizedBox(height: 20),
-        _buildCard('Historial de Vacunas', [
-          _buildListaDinamica(_ctrlNuevaVacuna, _listaVacunas, 'Agregar Vacuna (Ej: Newcastle)'),
+        _buildCard('Vacunas', [
+          _buildListaDinamica(_ctrlNuevaVacuna, _listaVacunas, 'Agregar Vacuna'),
         ]),
         const SizedBox(height: 20),
-        _buildCard('Récord de Peleas', [
-          _buildListaDinamica(_ctrlNuevaPelea, _listaPeleas, 'Agregar Pelea (Ej: Ganó en 12min)'),
+        _buildCard('Peleas', [
+          _buildListaDinamica(_ctrlNuevaPelea, _listaPeleas, 'Agregar Pelea'),
         ]),
         const SizedBox(height: 60),
       ],
     );
   }
 
-  // === PESTAÑA 4: FINANZAS Y EXTRA ===
+  // PESTAÑA 4
   Widget _buildTabFinanzas() {
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -478,38 +480,19 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         ]),
         const SizedBox(height: 20),
         _buildCard('Multimedia y Notas', [
-          _buildInput(_ctrlVideo, 'Link de Video (YouTube/Drive)', icon: Icons.video_library),
+          _buildInput(_ctrlVideo, 'Link de Video', icon: Icons.video_library),
           const SizedBox(height: 15),
-          _buildInput(_ctrlNotas, 'Notas / Observaciones', maxLines: 3),
+          _buildInput(_ctrlNotas, 'Notas', maxLines: 3),
         ]),
         const SizedBox(height: 60),
       ],
     );
   }
 
-  // ================== WIDGETS AUXILIARES ==================
-
-  Widget _buildFotoPicker() {
-    return Center(
-      child: GestureDetector(
-        onTap: _seleccionarImagen,
-        child: Container(
-          width: 150, height: 150,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: Colors.grey.shade300),
-            image: _rutaFoto != null ? DecorationImage(image: FileImage(File(_rutaFoto!)), fit: BoxFit.cover) : null,
-          ),
-          child: _rutaFoto == null ? const Icon(Icons.add_a_photo, size: 50, color: Color(0xFF1E3A8A)) : null,
-        ),
-      ),
-    );
-  }
-
+  // WIDGETS AUXILIARES
   Widget _buildCard(String title, List<Widget> children) {
     return Card(
-      elevation: 3,
+      elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(20),

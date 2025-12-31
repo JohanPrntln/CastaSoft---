@@ -1,8 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:castasoft/modelos/gallo_modelo.dart'; // Importamos el modelo por si acaso
 
 class ServicioFirestore {
-  // Patrón Singleton: Para que solo haya una conexión abierta a la vez
+  // Patrón Singleton
   static final ServicioFirestore _instancia = ServicioFirestore._interno();
   factory ServicioFirestore() => _instancia;
   ServicioFirestore._interno();
@@ -14,32 +15,41 @@ class ServicioFirestore {
 
   // ==================== USUARIO Y SEGURIDAD ====================
 
-  /// Obtiene el ID del usuario actual (ej: "A1b2C3d4...")
+  /// Obtiene el ID del usuario actual
   String get uidUsuarioActual => _auth.currentUser?.uid ?? '';
 
   /// Verifica si hay alguien logueado
   bool get estaAutenticado => _auth.currentUser != null;
 
+  // 🔥 NUEVAS FUNCIONES AGREGADAS PARA EL LOGIN 🔥
+  
+  /// Inicia sesión con correo y contraseña
+  Future<void> iniciarSesion(String email, String password) async {
+    await _auth.signInWithEmailAndPassword(email: email, password: password);
+  }
+
+  /// Cierra la sesión actual
+  Future<void> cerrarSesion() async {
+    await _auth.signOut();
+  }
+  // -----------------------------------------------------------
+
   // ==================== LECTURA DE DATOS ====================
 
-  /// Escucha en TIEMPO REAL los gallos del usuario.
-  /// Filtra automáticamente para traer SOLO los gallos de este usuario.
+  /// Escucha en TIEMPO REAL los gallos del usuario
   Stream<QuerySnapshot<Map<String, dynamic>>> gallosEnTiempoReal() {
     if (!estaAutenticado) {
-      // Si no hay usuario, devolvemos un stream vacío para no dar error
       return const Stream.empty();
     }
-
     return _firestore
         .collection('gallos')
-        .where('userId', isEqualTo: uidUsuarioActual) // ¡Aquí está el filtro de seguridad!
+        .where('userId', isEqualTo: uidUsuarioActual)
         .snapshots();
   }
 
-  /// Consulta simple (una sola vez)
+  /// Consulta simple
   Future<QuerySnapshot<Map<String, dynamic>>> obtenerGallos() async {
     if (!estaAutenticado) throw Exception('No autenticado');
-    
     return _firestore
         .collection('gallos')
         .where('userId', isEqualTo: uidUsuarioActual)
@@ -52,14 +62,16 @@ class ServicioFirestore {
   Future<void> crearGallo(Map<String, dynamic> datosGallo) async {
     if (!estaAutenticado) throw Exception('Debes iniciar sesión');
 
-    // IMPORTANTE: Aseguramos que el gallo quede a nombre de este usuario
     datosGallo['userId'] = uidUsuarioActual;
-    
-    // Agregamos fechas automáticas
     datosGallo['fechaCreacion'] = DateTime.now().toIso8601String();
     
-    // Guardamos en la colección 'gallos'
-    await _firestore.collection('gallos').add(datosGallo);
+    // Usamos .doc(id).set() en lugar de .add() si el mapa ya trae un ID generado
+    // Esto evita que Firebase cree un ID nuevo si ya tenemos uno
+    if (datosGallo.containsKey('id') && datosGallo['id'] != null) {
+       await _firestore.collection('gallos').doc(datosGallo['id']).set(datosGallo);
+    } else {
+       await _firestore.collection('gallos').add(datosGallo);
+    }
   }
 
   /// Actualiza un gallo
@@ -68,39 +80,54 @@ class ServicioFirestore {
 
     datos['fechaActualizacion'] = DateTime.now().toIso8601String();
     
-    // Buscamos el documento por su ID y lo actualizamos
-    // Nota: Como filtramos por userId en la lectura, es seguro editar directo por ID
+    // Aseguramos que no se pierda el userId al actualizar
+    // (Aunque update solo toca los campos enviados, es mejor prevenir)
+    if (!datos.containsKey('userId')) {
+       // Opcional: Podríamos revalidar, pero update es seguro
+    }
+
     await _firestore.collection('gallos').doc(idGallo).update(datos);
   }
 
   /// Elimina un gallo
   Future<void> eliminarGallo(String idGallo) async {
     if (!estaAutenticado) throw Exception('Debes iniciar sesión');
-
     await _firestore.collection('gallos').doc(idGallo).delete();
+  }
+  
+  // === MÉTODO DE COMPATIBILIDAD (Por si el proveedor usa guardarGallo) ===
+  Future<void> guardarGallo(Gallo gallo) async {
+      // Convertimos el objeto Gallo a Mapa
+      final mapa = gallo.toMap();
+      
+      // Verificamos si existe para saber si actualizar o crear
+      final docRef = _firestore.collection('gallos').doc(gallo.id);
+      final docSnap = await docRef.get();
+
+      if (docSnap.exists) {
+        await actualizarGallo(gallo.id, mapa);
+      } else {
+        await crearGallo(mapa);
+      }
   }
 
   // ==================== VALIDACIONES ====================
 
-  /// Revisa si ya existe una placa igual para este usuario
   Future<bool> validarPlacaDuplicada(String placa, {String? idExcluir}) async {
     if (!estaAutenticado) return false;
 
     Query consulta = _firestore
         .collection('gallos')
         .where('userId', isEqualTo: uidUsuarioActual)
-        .where('placa', isEqualTo: placa); // Firestore es sensible a mayúsculas, ojo
+        .where('placa', isEqualTo: placa);
 
-    // Si encontramos gallos con esa placa...
     final snapshot = await consulta.get();
 
-    // Filtramos manualmente en memoria para ignorar mayúsculas/minúsculas y el ID actual
-    // (Firestore es limitado con búsquedas complejas de texto)
     for (var doc in snapshot.docs) {
-      if (idExcluir != null && doc.id == idExcluir) continue; // Es el mismo gallo que editamos
-      return true; // Encontramos un duplicado
+      if (idExcluir != null && doc.id == idExcluir) continue;
+      return true;
     }
 
-    return false; // No hay duplicados
+    return false;
   }
 }

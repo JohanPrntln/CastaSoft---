@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:provider/provider.dart'; // Importante para acceder al servicio
+import 'package:castasoft/servicios/servicio_firestore.dart'; // Tu servicio real
 
 class PantallaLogin extends StatefulWidget {
   const PantallaLogin({Key? key}) : super(key: key);
@@ -10,21 +12,15 @@ class PantallaLogin extends StatefulWidget {
 }
 
 class _PantallaLoginState extends State<PantallaLogin> {
-  // Controladores para los campos de entrada
   final TextEditingController _controladorUsuario = TextEditingController();
   final TextEditingController _controladorContrasena = TextEditingController();
 
-  // Variable para controlar visibilidad de contraseña
   bool _mostrarContrasena = false;
-
-  // Variable para mostrar errores de validación
   String? _mensajeErrorUsuario;
   String? _mensajeErrorContrasena;
-
-  // Variable para indicar carga durante el login
   bool _estaCargando = false;
 
-  // Colores del sistema CastaSoft - Paleta Premium
+  // Colores del sistema CastaSoft
   static const Color _azulMarino = Color(0xFF1E3A8A);
   static const Color _dorado = Color(0xFFD4AF37);
   static const Color _blanco = Color(0xFFFFFFFF);
@@ -39,7 +35,6 @@ class _PantallaLoginState extends State<PantallaLogin> {
     super.dispose();
   }
 
-  /// Valida los campos del formulario
   bool _validarFormulario() {
     setState(() {
       _mensajeErrorUsuario = null;
@@ -48,60 +43,80 @@ class _PantallaLoginState extends State<PantallaLogin> {
 
     bool esValido = true;
 
-    // Validar campo de usuario
-    if (_controladorUsuario.text.isEmpty) {
-      setState(() {
-        _mensajeErrorUsuario = 'El usuario es requerido';
-      });
+    if (_controladorUsuario.text.trim().isEmpty) {
+      setState(() => _mensajeErrorUsuario = 'El usuario es requerido');
       esValido = false;
     }
 
-    // Validar campo de contraseña
-    if (_controladorContrasena.text.isEmpty) {
-      setState(() {
-        _mensajeErrorContrasena = 'La contraseña es requerida';
-      });
+    if (_controladorContrasena.text.trim().isEmpty) {
+      setState(() => _mensajeErrorContrasena = 'La contraseña es requerida');
       esValido = false;
     } else if (_controladorContrasena.text.length < 6) {
-      setState(() {
-        _mensajeErrorContrasena =
-            'La contraseña debe tener al menos 6 caracteres';
-      });
+      setState(() => _mensajeErrorContrasena = 'Mínimo 6 caracteres');
       esValido = false;
     }
 
     return esValido;
   }
 
-  /// Maneja el proceso de login
+  // --- AQUÍ ESTÁ LA LÓGICA DE SEGURIDAD REAL ---
   Future<void> _iniciarSesion() async {
-    if (!_validarFormulario()) {
-      return;
-    }
+    // 1. Ocultar teclado
+    FocusScope.of(context).unfocus();
 
-    setState(() {
-      _estaCargando = true;
-    });
+    if (!_validarFormulario()) return;
 
-    // Simular un pequeño retraso para autenticación (mockup)
-    await Future.delayed(const Duration(milliseconds: 1500));
+    setState(() => _estaCargando = true);
 
-    if (mounted) {
-      setState(() {
-        _estaCargando = false;
-      });
+    try {
+      // 2. Llamar al servicio REAL de Firebase
+      final servicio = context.read<ServicioFirestore>();
+      
+      // Intentamos entrar con correo y contraseña
+      await servicio.iniciarSesion(
+        _controladorUsuario.text.trim(),
+        _controladorContrasena.text.trim(),
+      );
 
-      // Navegar a la pantalla de inicio
+      if (!mounted) return;
+
+      // 3. ¡Éxito! Navegar al inicio
       Navigator.of(context).pushReplacementNamed('/inicio');
+
+    }  catch (e) {
+      if (!mounted) return;
+      
+      setState(() => _estaCargando = false);
+      
+      // --- CAMBIO TEMPORAL: MOSTRAR EL ERROR REAL ---
+      // Esto nos dirá si es "wrong-password", "network-error" o "invalid-api-key"
+      String mensajeError = e.toString(); 
+      // ----------------------------------------------
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white),
+              const SizedBox(width: 10),
+              Expanded(child: Text(mensajeError)), // Aquí veremos el error técnico
+            ],
+          ),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 10), // Que dure bastante para leerlo
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // El diseño visual se mantiene idéntico, solo cambiamos la lógica de arriba.
+    // ... (El resto de tu código de UI sigue igual, usa el que tenías o copia este si prefieres) ...
     return Scaffold(
       body: Stack(
         children: [
-          // Fondo con Gradiente Radial Premium
           Container(
             decoration: BoxDecoration(
               gradient: RadialGradient(
@@ -115,8 +130,6 @@ class _PantallaLoginState extends State<PantallaLogin> {
               ),
             ),
           ),
-
-          // Contenido principal centrado
           SingleChildScrollView(
             child: SizedBox(
               height: MediaQuery.of(context).size.height,
@@ -127,11 +140,8 @@ class _PantallaLoginState extends State<PantallaLogin> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Encabezado con logo
                       _construirEncabezado(),
                       const SizedBox(height: 50),
-
-                      // Tarjeta de login de lujo
                       _construirTarjetaLogin(),
                     ],
                   ),
@@ -144,65 +154,37 @@ class _PantallaLoginState extends State<PantallaLogin> {
     );
   }
 
-  /// Construye el encabezado con logo y textos de bienvenida
   Widget _construirEncabezado() {
     return Column(
       children: [
-        // Logo con resplandor dorado - Pluma grande y visible
         Container(
           width: 160,
           height: 160,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             boxShadow: [
-              BoxShadow(
-                color: _dorado.withOpacity(0.5),
-                blurRadius: 50,
-                spreadRadius: 20,
-              ),
-              BoxShadow(
-                color: _dorado.withOpacity(0.25),
-                blurRadius: 80,
-                spreadRadius: 35,
-              ),
+              BoxShadow(color: _dorado.withOpacity(0.5), blurRadius: 50, spreadRadius: 20),
+              BoxShadow(color: _dorado.withOpacity(0.25), blurRadius: 80, spreadRadius: 35),
             ],
           ),
-          child: Image.asset(
-            'assets/pluma_login-removebg-preview.png',
-            fit: BoxFit.contain,
-          ),
+          child: Image.asset('assets/pluma_login-removebg-preview.png', fit: BoxFit.contain),
         ),
         const SizedBox(height: 50),
-
-        // Título principal
         Text(
           'Bienvenido a CastaSoft',
           textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(
-            fontSize: 32,
-            fontWeight: FontWeight.bold,
-            color: _blanco,
-            letterSpacing: -0.5,
-          ),
+          style: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.bold, color: _blanco, letterSpacing: -0.5),
         ),
         const SizedBox(height: 12),
-
-        // Subtítulo dorado
         Text(
           'Gestión Genética de Élite',
           textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: _dorado,
-            letterSpacing: 2.0,
-          ),
+          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500, color: _dorado, letterSpacing: 2.0),
         ),
       ],
     );
   }
 
-  /// Construye la tarjeta de login de lujo
   Widget _construirTarjetaLogin() {
     return Container(
       constraints: const BoxConstraints(maxWidth: 420),
@@ -210,41 +192,23 @@ class _PantallaLoginState extends State<PantallaLogin> {
         color: _blanco,
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.25),
-            blurRadius: 20,
-            spreadRadius: 0,
-            offset: const Offset(0, 10),
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 20, offset: const Offset(0, 10)),
         ],
       ),
       padding: const EdgeInsets.all(30),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Campo de Usuario
           _construirCampoUsuario(),
           const SizedBox(height: 24),
-
-          // Campo de Contraseña
           _construirCampoContrasena(),
           const SizedBox(height: 32),
-
-          // Botón de iniciar sesión
           _construirBotonIniciarSesion(),
           const SizedBox(height: 20),
-
-          // Link de contraseña olvidada
           Center(
             child: Text(
               '¿Olvidaste tu contraseña?',
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                color: _celisteClaro,
-                decoration: TextDecoration.underline,
-                decorationColor: _celisteClaro.withOpacity(0.3),
-                fontWeight: FontWeight.w500,
-              ),
+              style: GoogleFonts.poppins(fontSize: 13, color: _celisteClaro, decoration: TextDecoration.underline, fontWeight: FontWeight.w500),
             ),
           ),
         ],
@@ -252,177 +216,54 @@ class _PantallaLoginState extends State<PantallaLogin> {
     );
   }
 
-  /// Construye el campo de entrada de usuario
   Widget _construirCampoUsuario() {
     return TextFormField(
       controller: _controladorUsuario,
       decoration: InputDecoration(
         hintText: 'Ingresa tu usuario o correo',
-        hintStyle: GoogleFonts.poppins(
-          fontSize: 13,
-          color: _grisNeutro.withOpacity(0.5),
-          fontWeight: FontWeight.w400,
-        ),
-        prefixIcon: Padding(
-          padding: const EdgeInsets.only(left: 14, right: 10),
-          child: Icon(FontAwesomeIcons.user, size: 16, color: _dorado),
-        ),
-        prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+        hintStyle: GoogleFonts.poppins(fontSize: 13, color: _grisNeutro.withOpacity(0.5)),
+        prefixIcon: const Padding(padding: EdgeInsets.only(left: 14, right: 10), child: Icon(FontAwesomeIcons.user, size: 16, color: _dorado)),
         filled: true,
         fillColor: _grisClaro,
-        contentPadding: const EdgeInsets.symmetric(
-          vertical: 14,
-          horizontal: 16,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: _mensajeErrorUsuario != null
-                ? Colors.red
-                : Colors.transparent,
-            width: 1.5,
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: _dorado, width: 2),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
         errorText: _mensajeErrorUsuario,
-        errorStyle: GoogleFonts.poppins(
-          fontSize: 11,
-          color: Colors.red,
-          fontWeight: FontWeight.w500,
-        ),
       ),
-      style: GoogleFonts.poppins(
-        fontSize: 13,
-        color: _azulMarino,
-        fontWeight: FontWeight.w500,
-      ),
-      onChanged: (_) {
-        if (_mensajeErrorUsuario != null) {
-          setState(() {
-            _mensajeErrorUsuario = null;
-          });
-        }
-      },
+      style: GoogleFonts.poppins(fontSize: 13, color: _azulMarino, fontWeight: FontWeight.w500),
     );
   }
 
-  /// Construye el campo de entrada de contraseña
   Widget _construirCampoContrasena() {
     return TextFormField(
       controller: _controladorContrasena,
       obscureText: !_mostrarContrasena,
       decoration: InputDecoration(
         hintText: 'Ingresa tu contraseña',
-        hintStyle: GoogleFonts.poppins(
-          fontSize: 13,
-          color: _grisNeutro.withOpacity(0.5),
-          fontWeight: FontWeight.w400,
-        ),
-        prefixIcon: Padding(
-          padding: const EdgeInsets.only(left: 14, right: 10),
-          child: Icon(FontAwesomeIcons.lock, size: 16, color: _dorado),
-        ),
-        prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+        hintStyle: GoogleFonts.poppins(fontSize: 13, color: _grisNeutro.withOpacity(0.5)),
+        prefixIcon: const Padding(padding: EdgeInsets.only(left: 14, right: 10), child: Icon(FontAwesomeIcons.lock, size: 16, color: _dorado)),
         suffixIcon: GestureDetector(
-          onTap: () {
-            setState(() {
-              _mostrarContrasena = !_mostrarContrasena;
-            });
-          },
-          child: Padding(
-            padding: const EdgeInsets.only(right: 14),
-            child: Icon(
-              _mostrarContrasena
-                  ? FontAwesomeIcons.eye
-                  : FontAwesomeIcons.eyeSlash,
-              size: 16,
-              color: _grisNeutro.withOpacity(0.6),
-            ),
-          ),
+          onTap: () => setState(() => _mostrarContrasena = !_mostrarContrasena),
+          child: Padding(padding: const EdgeInsets.only(right: 14), child: Icon(_mostrarContrasena ? FontAwesomeIcons.eye : FontAwesomeIcons.eyeSlash, size: 16, color: _grisNeutro.withOpacity(0.6))),
         ),
         filled: true,
         fillColor: _grisClaro,
-        contentPadding: const EdgeInsets.symmetric(
-          vertical: 14,
-          horizontal: 16,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: _mensajeErrorContrasena != null
-                ? Colors.red
-                : Colors.transparent,
-            width: 1.5,
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: _dorado, width: 2),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
         errorText: _mensajeErrorContrasena,
-        errorStyle: GoogleFonts.poppins(
-          fontSize: 11,
-          color: Colors.red,
-          fontWeight: FontWeight.w500,
-        ),
       ),
-      style: GoogleFonts.poppins(
-        fontSize: 13,
-        color: _azulMarino,
-        fontWeight: FontWeight.w500,
-      ),
-      onChanged: (_) {
-        if (_mensajeErrorContrasena != null) {
-          setState(() {
-            _mensajeErrorContrasena = null;
-          });
-        }
-      },
+      style: GoogleFonts.poppins(fontSize: 13, color: _azulMarino, fontWeight: FontWeight.w500),
     );
   }
 
-  /// Construye el botón de iniciar sesión con StadiumBorder
   Widget _construirBotonIniciarSesion() {
     return ElevatedButton(
       onPressed: _estaCargando ? null : _iniciarSesion,
       style: ElevatedButton.styleFrom(
         backgroundColor: _dorado,
-        disabledBackgroundColor: _dorado.withOpacity(0.5),
         shape: const StadiumBorder(),
         padding: const EdgeInsets.symmetric(vertical: 15),
-        elevation: 3,
       ),
       child: _estaCargando
-          ? SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  _azulMarino.withOpacity(0.9),
-                ),
-                strokeWidth: 2.5,
-              ),
-            )
-          : Text(
-              'Iniciar Sesión',
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: _azulMarino,
-                letterSpacing: 0.5,
-              ),
-            ),
+          ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(_azulMarino.withOpacity(0.9)), strokeWidth: 2.5))
+          : Text('Iniciar Sesión', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: _azulMarino)),
     );
   }
 }

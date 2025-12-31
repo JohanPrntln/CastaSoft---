@@ -1,4 +1,5 @@
-import 'package:url_launcher/url_launcher.dart'; // Para abrir links
+import 'dart:convert'; // NECESARIO PARA LEER LA FOTO
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -6,8 +7,6 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'dart:io';
 import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
-// Importamos url_launcher para abrir videos (opcional, si no lo tienes no pasa nada, he puesto un manejo seguro)
-// import 'package:url_launcher/url_launcher.dart'; 
 
 class PantallaDetalleGallo extends StatelessWidget {
   final Gallo gallo;
@@ -16,19 +15,51 @@ class PantallaDetalleGallo extends StatelessWidget {
 
   // ================= UTILIDADES =================
 
+  // FUNCIÓN PARA EL ZOOM (Pantalla completa) 🔍
+  void _mostrarImagenGrande(BuildContext context, ImageProvider imagen) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.9), // Fondo oscuro
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            Center(
+              child: InteractiveViewer( // Permite pellizcar para zoom
+                panEnabled: true,
+                minScale: 0.5,
+                maxScale: 4,
+                child: Image(image: imagen, fit: BoxFit.contain),
+              ),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   int _calcularEdadMeses(DateTime fechaNacimiento) {
     final dias = DateTime.now().difference(fechaNacimiento).inDays;
     return (dias / 30).floor();
   }
 
-  String _fmtFecha(DateTime fecha) => '${fecha.day}/${fecha.month}/${fecha.year}';
-
   Color _colorEstado(String estado) {
     switch (estado) {
-      case 'Activo': return const Color(0xFF10B981); // Verde
-      case 'Vendido': return const Color(0xFF6366F1); // Azul Indigo
-      case 'Baja': return const Color(0xFFEF4444); // Rojo
-      case 'Retirado': return const Color(0xFFF59E0B); // Ambar
+      case 'Activo': return const Color(0xFF10B981);
+      case 'Vendido': return const Color(0xFF6366F1);
+      case 'Baja': return const Color(0xFFEF4444);
+      case 'Retirado': return const Color(0xFFF59E0B);
       default: return Colors.grey;
     }
   }
@@ -38,13 +69,15 @@ class PantallaDetalleGallo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9), // Fondo gris muy suave
+      backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        title: Text(gallo.nombre, style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+        title: Text(gallo.nombre, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white)),
         backgroundColor: const Color(0xFF1E3A8A),
+        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         actions: [
           PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
             onSelected: (value) => Navigator.pop(context, value),
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'editar', child: Row(children: [Icon(Icons.edit, color: Colors.blue), SizedBox(width: 10), Text('Editar')])),
@@ -78,8 +111,28 @@ class PantallaDetalleGallo extends StatelessWidget {
     );
   }
 
-  // 1. ENCABEZADO CON FOTO Y ESTADO
+  // 1. ENCABEZADO MEJORADO (GRANDE Y CON ZOOM) ✅
   Widget _buildEncabezado(BuildContext context) {
+    
+    // Lógica inteligente para sacar la imagen (Base64 o File o nada)
+    ImageProvider? proveedorImagen;
+    
+    if (gallo.fotoPath != null) {
+      if (gallo.fotoPath!.startsWith('base64,')) {
+        // Caso A: Es Texto Base64 (Nube gratis)
+        try {
+          final String base64String = gallo.fotoPath!.split(',').last;
+          proveedorImagen = MemoryImage(base64Decode(base64String));
+        } catch (e) { print(e); }
+      } else {
+        // Caso B: Es Ruta Local (Antiguo / Respaldo)
+        File imgFile = File(gallo.fotoPath!);
+        if (imgFile.existsSync()) {
+          proveedorImagen = FileImage(imgFile);
+        }
+      }
+    }
+
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -94,41 +147,48 @@ class PantallaDetalleGallo extends StatelessWidget {
         children: [
           Hero(
             tag: gallo.id,
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 4),
-                boxShadow: [BoxShadow(blurRadius: 10, color: Colors.black26)],
-              ),
-              child: CircleAvatar(
-                radius: 60,
-                backgroundColor: Colors.white,
-                backgroundImage: gallo.fotoPath != null ? FileImage(File(gallo.fotoPath!)) : null,
-                child: gallo.fotoPath == null 
-                  ? const Icon(FontAwesomeIcons.kiwiBird, size: 50, color: Colors.grey) 
+            child: GestureDetector( // DETECTA EL CLICK PARA ZOOM 🔍
+              onTap: proveedorImagen != null 
+                  ? () => _mostrarImagenGrande(context, proveedorImagen!) 
                   : null,
+              child: Container(
+                // 🔥 AQUI CAMBIAMOS EL TAMAÑO A 200 (ANTES ERA 140) 🔥
+                width: 200, 
+                height: 200,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(25), // Bordes más redondeados
+                  border: Border.all(color: Colors.white, width: 4),
+                  boxShadow: [const BoxShadow(blurRadius: 15, color: Colors.black38)],
+                  image: proveedorImagen != null 
+                      ? DecorationImage(image: proveedorImagen, fit: BoxFit.cover) 
+                      : null,
+                ),
+                child: proveedorImagen == null 
+                    ? const Icon(FontAwesomeIcons.kiwiBird, size: 80, color: Colors.grey) 
+                    : null,
               ),
             ),
           ),
-          const SizedBox(height: 15),
+          const SizedBox(height: 20),
           Text(
             gallo.placa, 
-            style: GoogleFonts.poppins(color: Colors.white70, fontSize: 16, letterSpacing: 1.2)
+            style: GoogleFonts.poppins(color: Colors.white70, fontSize: 18, letterSpacing: 1.5)
           ),
           Text(
             gallo.nombre, 
-            style: GoogleFonts.poppins(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)
+            style: GoogleFonts.poppins(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)
           ),
           const SizedBox(height: 10),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             decoration: BoxDecoration(
               color: _colorEstado(gallo.estado),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
               gallo.estado.toUpperCase(),
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
             ),
           ),
         ],
@@ -136,13 +196,13 @@ class PantallaDetalleGallo extends StatelessWidget {
     );
   }
 
-  // 2. TARJETAS DE RESUMEN (EDAD, PESO, SEXO)
+  // ... RESTO DE WIDGETS (IGUAL QUE ANTES) ...
+
   Widget _buildResumenRapido() {
     return Row(
       children: [
         _datoCard(FontAwesomeIcons.calendar, '${_calcularEdadMeses(gallo.fechaNacimiento)} Meses', 'Edad'),
         const SizedBox(width: 10),
-        // CORRECCIÓN AQUÍ: Usamos pesoActual en lugar de peso
         _datoCard(FontAwesomeIcons.weightScale, '${gallo.pesoActual ?? "--"} Kg', 'Peso'),
         const SizedBox(width: 10),
         _datoCard(gallo.sexo == 'Macho' ? FontAwesomeIcons.mars : FontAwesomeIcons.venus, gallo.sexo, 'Sexo'),
@@ -150,7 +210,6 @@ class PantallaDetalleGallo extends StatelessWidget {
     );
   }
 
-  // 3. GENEALOGÍA (ÁRBOL VISUAL)
   Widget _buildSeccionGenealogia(BuildContext context) {
     return Card(
       elevation: 4,
@@ -162,7 +221,6 @@ class PantallaDetalleGallo extends StatelessWidget {
           children: [
             _tituloSeccion('Genealogía', FontAwesomeIcons.sitemap),
             const SizedBox(height: 15),
-            // Línea Paterna
             _filaPariente('Padre', _obtenerNombrePadre(context), FontAwesomeIcons.mars, Colors.blue),
             Padding(
               padding: const EdgeInsets.only(left: 30, top: 5),
@@ -174,7 +232,6 @@ class PantallaDetalleGallo extends StatelessWidget {
               ),
             ),
             const Divider(height: 20),
-            // Línea Materna
             _filaPariente('Madre', _obtenerNombreMadre(context), FontAwesomeIcons.venus, Colors.pink),
             Padding(
               padding: const EdgeInsets.only(left: 30, top: 5),
@@ -194,7 +251,6 @@ class PantallaDetalleGallo extends StatelessWidget {
     );
   }
 
-  // 4. SALUD Y COMBATE (VACUNAS Y PELEAS)
   Widget _buildSeccionSaludYCombate() {
     return Card(
       elevation: 4,
@@ -223,9 +279,6 @@ class PantallaDetalleGallo extends StatelessWidget {
     );
   }
 
-  // 5. FINANZAS Y EXTRA (CON VIDEO)
-  
-  
   Widget _buildSeccionFinanzasYExtra(BuildContext context) {
     return Card(
       elevation: 4,
@@ -249,7 +302,6 @@ class PantallaDetalleGallo extends StatelessWidget {
               ],
             ),
             
-            // === BOTÓN DE VIDEO ===
             if (gallo.videoUrl != null && gallo.videoUrl!.isNotEmpty) ...[
               const SizedBox(height: 15),
               SizedBox(
@@ -257,20 +309,15 @@ class PantallaDetalleGallo extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     String urlString = gallo.videoUrl!;
-                    
-                    // Corrección automática de link
                     if (!urlString.startsWith('http')) {
                       urlString = 'https://$urlString'; 
                     }
-
                     final Uri url = Uri.parse(urlString);
-                    
                     try {
                       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
                         throw 'No se pudo lanzar';
                       }
                     } catch (e) {
-                      // AHORA SÍ FUNCIONARÁ PORQUE YA TENEMOS EL CONTEXT
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('No se pudo abrir el video: $urlString')),
@@ -301,8 +348,8 @@ class PantallaDetalleGallo extends StatelessWidget {
       ),
     );
   }
-  // ================= WIDGETS AUXILIARES =================
 
+  // WIDGETS AUXILIARES
   Widget _datoCard(IconData icon, String valor, String label) {
     return Expanded(
       child: Container(
@@ -327,7 +374,7 @@ class PantallaDetalleGallo extends StatelessWidget {
   Widget _tituloSeccion(String titulo, IconData icono) {
     return Row(
       children: [
-        Icon(icono, size: 18, color: const Color(0xFFD4AF37)), // Dorado
+        Icon(icono, size: 18, color: const Color(0xFFD4AF37)), 
         const SizedBox(width: 8),
         Text(titulo, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A))),
       ],
@@ -383,15 +430,10 @@ class PantallaDetalleGallo extends StatelessWidget {
     );
   }
 
-  // Métodos de ayuda para nombres de padres (igual que tenías pero más limpio)
   String _obtenerNombrePadre(BuildContext context) {
-    // 1. Si hay nombre en texto (lo nuevo), usalo.
     if (gallo.nombrePadre != null && gallo.nombrePadre!.isNotEmpty) return gallo.nombrePadre!;
-    
-    // 2. Si no, busca por ID en la base de datos
     final padreId = gallo.padreId ?? gallo.idPadre;
     if (padreId == null) return 'Desconocido';
-
     try {
       final padre = context.read<GallosProveedor>().obtenerGalloPorId(padreId);
       return padre?.nombre ?? 'Desconocido';
@@ -400,10 +442,8 @@ class PantallaDetalleGallo extends StatelessWidget {
 
   String _obtenerNombreMadre(BuildContext context) {
     if (gallo.nombreMadre != null && gallo.nombreMadre!.isNotEmpty) return gallo.nombreMadre!;
-    
     final madreId = gallo.madreId ?? gallo.idMadre;
     if (madreId == null) return 'Desconocido';
-
     try {
       final madre = context.read<GallosProveedor>().obtenerGalloPorId(madreId);
       return madre?.nombre ?? 'Desconocido';
