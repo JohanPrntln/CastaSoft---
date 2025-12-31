@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
+import 'dart:convert';
 
 // Importaciones de tus archivos
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
@@ -11,6 +12,7 @@ import 'package:castasoft/componentes/tarjeta_gallo.dart';
 import 'package:castasoft/pantallas/pantalla_formulario_gallo.dart';
 import 'package:castasoft/pantallas/pantalla_detalle_gallo.dart';
 import 'package:castasoft/modelos/gallo_modelo.dart';
+import 'package:castasoft/proveedores/usuario_proveedor.dart'; // IMPORTANTE: Para el logo y perfil
 
 class PantallaInicio extends StatefulWidget {
   const PantallaInicio({Key? key}) : super(key: key);
@@ -161,7 +163,6 @@ class _PantallaInicioState extends State<PantallaInicio> {
     }
   }
 
-  /// ENCABEZADO MODIFICADO (Sin el botón de agregar)
   Widget _construirEncabezado(BuildContext context) {
     return Material(
       color: Colors.white,
@@ -176,12 +177,85 @@ class _PantallaInicioState extends State<PantallaInicio> {
         child: SafeArea(
           child: Row(
             children: [
-              // Logo
-              Image.asset(
-                'assets/logo_texto_castasoft_sf.png',
-                height: 50,
-                fit: BoxFit.contain,
+              // ===============================================
+              // 🔥 LOGO INTELIGENTE (PERSONALIZADO) 🔥
+              // ===============================================
+              Consumer<UsuarioProveedor>(
+                builder: (context, usuarioProv, child) {
+                  final perfil = usuarioProv.perfil;
+
+                  // CASO 1: Si tiene logo personalizado en Base64
+                  if (perfil?.logoPath != null && perfil!.logoPath!.startsWith('base64,')) {
+                    try {
+                      final bytes = base64Decode(perfil.logoPath!.split(',').last);
+                      return Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.memory(bytes, height: 45, width: 45, fit: BoxFit.cover),
+                          ),
+                          const SizedBox(width: 10),
+                          // Si hay espacio, mostramos el nombre del castadero al lado
+                          if (MediaQuery.of(context).size.width > 360) 
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  perfil!.nombreCastadero,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A)
+                                  ),
+                                ),
+                                Text(
+                                  perfil.nombrePropietario,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 10, color: Colors.grey
+                                  ),
+                                ),
+                              ],
+                            )
+                        ],
+                      );
+                    } catch (e) { 
+                      return _logoPorDefecto(); 
+                    }
+                  }
+
+                  // CASO 2: Si NO tiene logo, pero SÍ tiene nombre configurado
+                  if (perfil != null && perfil.nombreCastadero.isNotEmpty) {
+                    return Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E3A8A).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(FontAwesomeIcons.houseUser, color: Color(0xFF1E3A8A), size: 24),
+                        ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              perfil.nombreCastadero,
+                              style: GoogleFonts.poppins(
+                                fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A)
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+                  }
+
+                  // CASO 3: Aún no carga o no tiene nada -> Logo CastaSoft
+                  return _logoPorDefecto();
+                },
               ),
+              // ===============================================
 
               const SizedBox(width: 24),
 
@@ -205,38 +279,40 @@ class _PantallaInicioState extends State<PantallaInicio> {
 
               const SizedBox(width: 16),
 
-              // Filtro (Compacto)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _filtroSeleccionado,
-                    icon: const Icon(Icons.arrow_drop_down, color: Colors.grey),
-                    style: GoogleFonts.poppins(fontSize: 13, color: Colors.black87),
-                    items: ['Todos', 'Activo', 'Vendido', 'Retirado'].map((String value) {
-                      return DropdownMenuItem<String>(value: value, child: Text(value));
-                    }).toList(),
-                    onChanged: (val) {
-                      context.read<GallosProveedor>().setFiltroEstado(val ?? 'Todos');
-                      setState(() => _filtroSeleccionado = val ?? 'Todos');
-                    },
+              // Filtro (Compacto) - Oculto en pantallas muy pequeñas para dar espacio al logo
+              if (MediaQuery.of(context).size.width > 400)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _filtroSeleccionado,
+                      icon: const Icon(Icons.arrow_drop_down, color: Colors.grey),
+                      style: GoogleFonts.poppins(fontSize: 13, color: Colors.black87),
+                      items: ['Todos', 'Activo', 'Vendido', 'Retirado'].map((String value) {
+                        return DropdownMenuItem<String>(value: value, child: Text(value));
+                      }).toList(),
+                      onChanged: (val) {
+                        context.read<GallosProveedor>().setFiltroEstado(val ?? 'Todos');
+                        setState(() => _filtroSeleccionado = val ?? 'Todos');
+                      },
+                    ),
                   ),
                 ),
-              ),
 
-              const SizedBox(width: 16),
+              if (MediaQuery.of(context).size.width > 400)
+                const SizedBox(width: 16),
 
               // DIVISOR VERTICAL
               Container(height: 30, width: 1, color: Colors.grey.shade300),
               
               const SizedBox(width: 10),
 
-              // BOTÓN DE SALIR (Puerta Roja)
+              // BOTÓN DE SALIR
               Tooltip(
                 message: 'Cerrar Sesión',
                 child: InkWell(
@@ -262,6 +338,8 @@ class _PantallaInicioState extends State<PantallaInicio> {
       ),
     );
   }
+
+  
 
   // ... CONTENIDO DASHBOARD Y ESTADÍSTICAS (Sin cambios estructurales) ...
   Widget _construirContenidoDashboard(BuildContext context) {
@@ -361,6 +439,14 @@ class _PantallaInicioState extends State<PantallaInicio> {
           ],
         );
       },
+    );
+  }
+ // Widget auxiliar para no repetir código (Agrégalo al final de la clase PantallaInicio)
+  Widget _logoPorDefecto() {
+    return Image.asset(
+      'assets/logo_texto_castasoft_sf.png',
+      height: 40,
+      fit: BoxFit.contain,
     );
   }
 }

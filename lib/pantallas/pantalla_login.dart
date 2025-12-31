@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart'; // Importante para acceder al servicio
 import 'package:castasoft/servicios/servicio_firestore.dart'; // Tu servicio real
+import 'package:castasoft/proveedores/usuario_proveedor.dart'; // <--- NUEVO
+import 'package:castasoft/pantallas/pantalla_configuracion_perfil.dart';
 
 class PantallaLogin extends StatefulWidget {
   const PantallaLogin({Key? key}) : super(key: key);
@@ -59,20 +61,17 @@ class _PantallaLoginState extends State<PantallaLogin> {
     return esValido;
   }
 
-  // --- AQUÍ ESTÁ LA LÓGICA DE SEGURIDAD REAL ---
-  Future<void> _iniciarSesion() async {
-    // 1. Ocultar teclado
+Future<void> _iniciarSesion() async {
+    // 1. Ocultar teclado y validar
     FocusScope.of(context).unfocus();
-
     if (!_validarFormulario()) return;
 
     setState(() => _estaCargando = true);
 
     try {
-      // 2. Llamar al servicio REAL de Firebase
+      // 2. Llamar al servicio REAL de Firebase (Autenticación)
       final servicio = context.read<ServicioFirestore>();
       
-      // Intentamos entrar con correo y contraseña
       await servicio.iniciarSesion(
         _controladorUsuario.text.trim(),
         _controladorContrasena.text.trim(),
@@ -80,18 +79,34 @@ class _PantallaLoginState extends State<PantallaLogin> {
 
       if (!mounted) return;
 
-      // 3. ¡Éxito! Navegar al inicio
-      Navigator.of(context).pushReplacementNamed('/inicio');
+      // 3. 🔥 VERIFICACIÓN DE PERFIL (LO NUEVO) 🔥
+      // Preguntamos: ¿Este usuario ya tiene logo y nombre de castadero?
+      final usuarioProv = context.read<UsuarioProveedor>();
+      final bool tienePerfil = await usuarioProv.verificarPerfilExistente();
 
-    }  catch (e) {
+      if (!mounted) return;
+
+      if (tienePerfil) {
+        // CASO A: Usuario viejo (Ya configuró todo) -> Va al Inicio
+        Navigator.of(context).pushReplacementNamed('/inicio');
+      } else {
+        // CASO B: Usuario nuevo (Primera vez) -> Va a Configuración
+        // Nota: Asegúrate de importar la pantalla arriba
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const PantallaConfiguracionPerfil())
+        );
+      }
+
+    } catch (e) {
       if (!mounted) return;
       
       setState(() => _estaCargando = false);
       
-      // --- CAMBIO TEMPORAL: MOSTRAR EL ERROR REAL ---
-      // Esto nos dirá si es "wrong-password", "network-error" o "invalid-api-key"
-      String mensajeError = e.toString(); 
-      // ----------------------------------------------
+      // Mensaje de error amigable
+      String mensajeError = 'Error de conexión o datos incorrectos';
+      if (e.toString().contains('user-not-found')) mensajeError = 'Usuario no encontrado';
+      if (e.toString().contains('wrong-password')) mensajeError = 'Contraseña incorrecta';
+      if (e.toString().contains('invalid-credential')) mensajeError = 'Credenciales inválidas';
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -99,12 +114,11 @@ class _PantallaLoginState extends State<PantallaLogin> {
             children: [
               const Icon(Icons.error_outline, color: Colors.white),
               const SizedBox(width: 10),
-              Expanded(child: Text(mensajeError)), // Aquí veremos el error técnico
+              Expanded(child: Text(mensajeError)),
             ],
           ),
           backgroundColor: Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 10), // Que dure bastante para leerlo
         ),
       );
     }
