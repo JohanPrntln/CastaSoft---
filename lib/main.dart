@@ -14,6 +14,7 @@ import 'package:castasoft/servicios/servicio_firestore.dart';
 // === PROVEEDORES ===
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
 import 'package:castasoft/proveedores/usuario_proveedor.dart'; // 🔥 Importación del nuevo proveedor
+import 'package:castasoft/proveedores/cruces_proveedor.dart';
 
 void main() async {
   // 1. Asegura que los widgets estén listos
@@ -58,6 +59,8 @@ class AplicacionCastaSoft extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => UsuarioProveedor(),
         ),
+        // 4. Proveedor de Cruces
+        ChangeNotifierProvider(create: (_) => CrucesProveedor()),
       ],
       child: MaterialApp(
         title: 'CastaSoft',

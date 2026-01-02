@@ -7,12 +7,12 @@ import 'dart:convert';
 // Importaciones de tus archivos
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
 import 'package:castasoft/servicios/servicio_firestore.dart';
-import 'package:castasoft/componentes/tarjeta_kpi.dart';
 import 'package:castasoft/componentes/tarjeta_gallo.dart';
 import 'package:castasoft/pantallas/pantalla_formulario_gallo.dart';
 import 'package:castasoft/pantallas/pantalla_detalle_gallo.dart';
 import 'package:castasoft/modelos/gallo_modelo.dart';
-import 'package:castasoft/proveedores/usuario_proveedor.dart'; // IMPORTANTE: Para el logo y perfil
+import 'package:castasoft/proveedores/usuario_proveedor.dart'; 
+import 'package:castasoft/pantallas/pantalla_lista_cruces.dart'; // ✅ IMPORTANTE
 
 class PantallaInicio extends StatefulWidget {
   const PantallaInicio({Key? key}) : super(key: key);
@@ -83,7 +83,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       
-      // ENCABEZADO SUPERIOR (Ahora más limpio)
+      // ENCABEZADO SUPERIOR
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(100),
         child: _construirEncabezado(context),
@@ -98,7 +98,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
         ),
       ),
 
-      // 🔥 AQUÍ ESTÁ EL NUEVO BOTÓN FLOTANTE 🔥
+      // BOTÓN FLOTANTE
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
@@ -109,12 +109,12 @@ class _PantallaInicioState extends State<PantallaInicio> {
         backgroundColor: const Color(0xFFD4AF37), // Dorado Premium
         elevation: 4,
         tooltip: 'Registrar Nuevo Gallo',
-        child: const Icon(FontAwesomeIcons.plus, color: Color(0xFF1E3A8A)), // Icono Azul Marino
+        child: const Icon(FontAwesomeIcons.plus, color: Color(0xFF1E3A8A)),
       ),
     );
   }
 
-  // ... MÉTODOS DE NAVEGACIÓN (Sin cambios) ...
+  // ... MÉTODOS DE NAVEGACIÓN ...
   Future<void> _navegarADetalleGallo(BuildContext context, Gallo gallo) async {
     final resultado = await Navigator.push<String>(
       context,
@@ -177,14 +177,10 @@ class _PantallaInicioState extends State<PantallaInicio> {
         child: SafeArea(
           child: Row(
             children: [
-              // ===============================================
-              // 🔥 LOGO INTELIGENTE (PERSONALIZADO) 🔥
-              // ===============================================
+              // 🔥 LOGO INTELIGENTE 🔥
               Consumer<UsuarioProveedor>(
                 builder: (context, usuarioProv, child) {
                   final perfil = usuarioProv.perfil;
-
-                  // CASO 1: Si tiene logo personalizado en Base64
                   if (perfil?.logoPath != null && perfil!.logoPath!.startsWith('base64,')) {
                     try {
                       final bytes = base64Decode(perfil.logoPath!.split(',').last);
@@ -195,7 +191,6 @@ class _PantallaInicioState extends State<PantallaInicio> {
                             child: Image.memory(bytes, height: 45, width: 45, fit: BoxFit.cover),
                           ),
                           const SizedBox(width: 10),
-                          // Si hay espacio, mostramos el nombre del castadero al lado
                           if (MediaQuery.of(context).size.width > 360) 
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,63 +198,38 @@ class _PantallaInicioState extends State<PantallaInicio> {
                               children: [
                                 Text(
                                   perfil!.nombreCastadero,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A)
-                                  ),
+                                  style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A)),
                                 ),
                                 Text(
                                   perfil.nombrePropietario,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 10, color: Colors.grey
-                                  ),
+                                  style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey),
                                 ),
                               ],
                             )
                         ],
                       );
-                    } catch (e) { 
-                      return _logoPorDefecto(); 
-                    }
+                    } catch (e) { return _logoPorDefecto(); }
                   }
-
-                  // CASO 2: Si NO tiene logo, pero SÍ tiene nombre configurado
                   if (perfil != null && perfil.nombreCastadero.isNotEmpty) {
                     return Row(
                       children: [
                         Container(
                           padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E3A8A).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                          decoration: BoxDecoration(color: const Color(0xFF1E3A8A).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
                           child: const Icon(FontAwesomeIcons.houseUser, color: Color(0xFF1E3A8A), size: 24),
                         ),
                         const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              perfil.nombreCastadero,
-                              style: GoogleFonts.poppins(
-                                fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A)
-                              ),
-                            ),
-                          ],
-                        ),
+                        Text(perfil.nombreCastadero, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A))),
                       ],
                     );
                   }
-
-                  // CASO 3: Aún no carga o no tiene nada -> Logo CastaSoft
                   return _logoPorDefecto();
                 },
               ),
-              // ===============================================
 
               const SizedBox(width: 24),
 
-              // Buscador Flexible
+              // Buscador
               Expanded(
                 child: TextField(
                   controller: _buscarController,
@@ -271,15 +241,13 @@ class _PantallaInicioState extends State<PantallaInicio> {
                     filled: true,
                     fillColor: Colors.grey.shade50,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide(color: Colors.grey.shade200)),
                   ),
                   onChanged: (value) => context.read<GallosProveedor>().setFiltroTexto(value),
                 ),
               ),
 
               const SizedBox(width: 16),
-
-              // Filtro (Compacto) - Oculto en pantallas muy pequeñas para dar espacio al logo
+              // Filtro
               if (MediaQuery.of(context).size.width > 400)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -293,9 +261,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                       value: _filtroSeleccionado,
                       icon: const Icon(Icons.arrow_drop_down, color: Colors.grey),
                       style: GoogleFonts.poppins(fontSize: 13, color: Colors.black87),
-                      items: ['Todos', 'Activo', 'Vendido', 'Retirado'].map((String value) {
-                        return DropdownMenuItem<String>(value: value, child: Text(value));
-                      }).toList(),
+                      items: ['Todos', 'Activo', 'Vendido', 'Retirado'].map((String value) => DropdownMenuItem(value: value, child: Text(value))).toList(),
                       onChanged: (val) {
                         context.read<GallosProveedor>().setFiltroEstado(val ?? 'Todos');
                         setState(() => _filtroSeleccionado = val ?? 'Todos');
@@ -304,15 +270,9 @@ class _PantallaInicioState extends State<PantallaInicio> {
                   ),
                 ),
 
-              if (MediaQuery.of(context).size.width > 400)
-                const SizedBox(width: 16),
-
-              // DIVISOR VERTICAL
+              if (MediaQuery.of(context).size.width > 400) const SizedBox(width: 16),
               Container(height: 30, width: 1, color: Colors.grey.shade300),
-              
               const SizedBox(width: 10),
-
-              // BOTÓN DE SALIR
               Tooltip(
                 message: 'Cerrar Sesión',
                 child: InkWell(
@@ -320,15 +280,8 @@ class _PantallaInicioState extends State<PantallaInicio> {
                   borderRadius: BorderRadius.circular(50),
                   child: Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      FontAwesomeIcons.rightFromBracket,
-                      size: 18,
-                      color: Colors.red.shade400,
-                    ),
+                    decoration: BoxDecoration(color: Colors.red.shade50, shape: BoxShape.circle),
+                    child: Icon(FontAwesomeIcons.rightFromBracket, size: 18, color: Colors.red.shade400),
                   ),
                 ),
               ),
@@ -339,17 +292,24 @@ class _PantallaInicioState extends State<PantallaInicio> {
     );
   }
 
-  
-
-  // ... CONTENIDO DASHBOARD Y ESTADÍSTICAS (Sin cambios estructurales) ...
+  // 🔥 DASHBOARD MEJORADO (DISEÑO PREMIUM) 🔥
   Widget _construirContenidoDashboard(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 1. SECCIÓN DE TARJETAS SUPERIORES (KPIs)
           _construirSeccionEstadisticas(),
-          const SizedBox(height: 40),
+          
+          const SizedBox(height: 20),
+          
+          // 2. 🔥 NUEVA TARJETA: MÓDULO DE CRUCES 🔥
+          _buildTarjetaModuloCruces(),
+          
+          const SizedBox(height: 30),
+          
+          // 3. LISTA DE GALLOS RECIENTES
           _construirSeccionListaReciente(),
         ],
       ),
@@ -362,22 +322,104 @@ class _PantallaInicioState extends State<PantallaInicio> {
         final estadisticas = gallosProveedor.obtenerEstadisticas();
         return Row(
           children: [
-            TarjetaKPI(
-              titulo: 'Gallos Activos',
-              valor: estadisticas['activos'] ?? 0,
-              colorFondo: const Color(0xFF1E3A8A).withOpacity(0.08),
-              icono: FontAwesomeIcons.circleCheck,
+            // TARJETA AZUL (ACTIVOS)
+            Expanded(
+              child: _buildTarjetaResumen(
+                titulo: 'Activos',
+                valor: estadisticas['activos'] ?? 0,
+                icono: FontAwesomeIcons.kiwiBird,
+                colores: [const Color(0xFF1E3A8A), const Color(0xFF3B82F6)], // Degradado Azul
+              ),
             ),
-            const SizedBox(width: 24),
-            TarjetaKPI(
-              titulo: 'Gallos Vendidos',
-              valor: estadisticas['vendidos'] ?? 0,
-              colorFondo: const Color(0xFFD4AF37).withOpacity(0.08),
-              icono: FontAwesomeIcons.sackDollar,
+            const SizedBox(width: 16),
+            // TARJETA DORADA (VENDIDOS) - Ahora se ve más "Dinero"
+            Expanded(
+              child: _buildTarjetaResumen(
+                titulo: 'Vendidos',
+                valor: estadisticas['vendidos'] ?? 0,
+                icono: FontAwesomeIcons.sackDollar,
+                colores: [const Color(0xFFD4AF37), const Color(0xFFF59E0B)], // Degradado Dorado
+              ),
             ),
           ],
         );
       },
+    );
+  }
+
+  // WIDGET AUXILIAR PARA LAS TARJETAS DE ARRIBA (Diseño Bonito)
+  Widget _buildTarjetaResumen({required String titulo, required int valor, required IconData icono, required List<Color> colores}) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: colores, begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: colores.first.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+            child: Icon(icono, color: Colors.white, size: 20),
+          ),
+          const SizedBox(height: 15),
+          Text(valor.toString(), style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+          Text(titulo, style: GoogleFonts.poppins(fontSize: 14, color: Colors.white.withOpacity(0.9))),
+        ],
+      ),
+    );
+  }
+
+  // WIDGET PARA LA TARJETA VERDE DE CRUCES
+  Widget _buildTarjetaModuloCruces() {
+    return InkWell(
+      onTap: () {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const PantallaListaCruces()));
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF059669), Color(0xFF34D399)], // Degradado Verde Esmeralda
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(color: const Color(0xFF059669).withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4)),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Cruces y Genética',
+                  style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 5),
+                const Text(
+                  'Gestiona camadas, padres y nacimientos',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ],
+            ),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+              child: const Icon(FontAwesomeIcons.dna, color: Colors.white, size: 24),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -390,7 +432,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Gallos Recientes',
+              'Inventario Reciente',
               style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: const Color(0xFF1E3A8A)),
             ),
             const SizedBox(height: 16),
@@ -410,38 +452,33 @@ class _PantallaInicioState extends State<PantallaInicio> {
                 ),
               )
             else
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-                child: SizedBox(
-                  height: 400,
-                  child: ListView.separated(
-                    itemCount: gallos.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final gallo = gallos[index];
-                      return GestureDetector(
-                        onTap: () => _navegarADetalleGallo(context, gallo),
-                        child: TarjetaGallo(
-                          gallo: gallo,
-                          onEdit: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => PantallaFormularioGallo(galloEditar: gallo)))
-                                .then((_) => context.read<GallosProveedor>().cargarGallos());
-                          },
-                          onDelete: () => _mostrarConfirmacionEliminar(context, gallo),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+              // Usamos shrinkWrap y physics para que funcione dentro del SingleChildScrollView principal
+              ListView.separated(
+                shrinkWrap: true, 
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: gallos.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final gallo = gallos[index];
+                  return GestureDetector(
+                    onTap: () => _navegarADetalleGallo(context, gallo),
+                    child: TarjetaGallo(
+                      gallo: gallo,
+                      onEdit: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => PantallaFormularioGallo(galloEditar: gallo)))
+                            .then((_) => context.read<GallosProveedor>().cargarGallos());
+                      },
+                      onDelete: () => _mostrarConfirmacionEliminar(context, gallo),
+                    ),
+                  );
+                },
               ),
           ],
         );
       },
     );
   }
- // Widget auxiliar para no repetir código (Agrégalo al final de la clase PantallaInicio)
+
   Widget _logoPorDefecto() {
     return Image.asset(
       'assets/logo_texto_castasoft_sf.png',
