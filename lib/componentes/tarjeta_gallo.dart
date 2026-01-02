@@ -1,4 +1,4 @@
-import 'dart:convert'; // IMPORTANTE: Para leer el texto de la foto
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -6,7 +6,7 @@ import 'package:castasoft/modelos/gallo_modelo.dart';
 
 class TarjetaGallo extends StatelessWidget {
   final Gallo gallo;
-  final VoidCallback? onTap; // Para dar click a la tarjeta entera
+  final VoidCallback? onTap;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
@@ -18,11 +18,10 @@ class TarjetaGallo extends StatelessWidget {
     this.onDelete,
   }) : super(key: key);
 
-  // FUNCIÓN PARA EL ZOOM (Pantalla completa) 🔍
   void _mostrarImagenGrande(BuildContext context, ImageProvider imagen) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.9), // Fondo oscuro
+      barrierColor: Colors.black.withOpacity(0.9),
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: EdgeInsets.zero,
@@ -30,7 +29,7 @@ class TarjetaGallo extends StatelessWidget {
           alignment: Alignment.topRight,
           children: [
             Center(
-              child: InteractiveViewer( // Permite pellizcar para zoom
+              child: InteractiveViewer(
                 panEnabled: true,
                 minScale: 0.5,
                 maxScale: 4,
@@ -54,13 +53,11 @@ class TarjetaGallo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 1. PREPARAMOS LA IMAGEN INTELIGENTE 🧠
     Widget widgetImagen;
     ImageProvider? proveedorImagen;
 
     if (gallo.fotoPath != null && gallo.fotoPath!.startsWith('base64,')) {
       try {
-        // Es texto Base64: Lo convertimos a imagen
         final String base64String = gallo.fotoPath!.split(',').last;
         final bytes = base64Decode(base64String);
         proveedorImagen = MemoryImage(bytes);
@@ -69,14 +66,13 @@ class TarjetaGallo extends StatelessWidget {
         widgetImagen = const Icon(Icons.broken_image, color: Colors.grey);
       }
     } else {
-      // No hay foto
       widgetImagen = const Icon(FontAwesomeIcons.kiwiBird, size: 30, color: Color(0xFF1E3A8A));
     }
 
     return Card(
       color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), // Bordes más suaves
-      elevation: 4, // Un poco más de sombra
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 4,
       margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -84,24 +80,24 @@ class TarjetaGallo extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             
-            // === FOTO CUADRADA GRANDE (Click para Zoom) ===
+            // === FOTO CUADRADA GRANDE ===
             GestureDetector(
               onTap: proveedorImagen != null 
                   ? () => _mostrarImagenGrande(context, proveedorImagen!) 
                   : null,
               child: Container(
-                width: 100, // TAMAÑO GRANDE
-                height: 100, // CUADRADO
+                width: 100, 
+                height: 100,
                 decoration: BoxDecoration(
                   color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(12), // Bordes redondeados pero cuadrado
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.grey.shade200),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: proveedorImagen != null 
-                      ? widgetImagen // Muestra la foto
-                      : Center(child: widgetImagen), // Muestra el icono centrado
+                      ? widgetImagen
+                      : Center(child: widgetImagen),
                 ),
               ),
             ),
@@ -129,7 +125,6 @@ class TarjetaGallo extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      // Badge Estado
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
@@ -148,24 +143,42 @@ class TarjetaGallo extends StatelessWidget {
                     ],
                   ),
                   
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   
-                  Text(
-                    'Placa: ${gallo.placa}',
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFFD4AF37), // Dorado
-                    ),
+                  // 🔥 PLACA Y PESO EN LA MISMA LÍNEA 🔥
+                  Row(
+                    children: [
+                      Text(
+                        'Placa: ${gallo.placa}',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFFD4AF37),
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      // INDICADOR DE PESO EN LIBRAS
+                      if (gallo.pesoActual != null) ...[
+                        const Icon(FontAwesomeIcons.weightScale, size: 10, color: Colors.grey),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${gallo.pesoActual} Lbs',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ]
+                    ],
                   ),
                   
                   const SizedBox(height: 12),
 
-                  // Botones de acción alineados a la derecha
+                  // Botones de acción
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                       // Botón Editar
                        InkWell(
                          onTap: onEdit,
                          child: Container(
@@ -175,7 +188,6 @@ class TarjetaGallo extends StatelessWidget {
                          ),
                        ),
                        const SizedBox(width: 10),
-                       // Botón Eliminar
                        InkWell(
                          onTap: onDelete,
                          child: Container(

@@ -10,22 +10,22 @@ class UsuarioProveedor with ChangeNotifier {
   UsuarioPerfil? get perfil => _perfilActual;
   bool get cargando => _cargando;
 
-  // Verificar si el usuario ya tiene perfil configurado
   Future<bool> verificarPerfilExistente() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return false;
+    // Si no hay usuario logueado, retornamos false
+    if (uid == null || uid.isEmpty) return false;
 
     try {
       final doc = await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
-      if (doc.exists) {
+      if (doc.exists && doc.data() != null) {
         _perfilActual = UsuarioPerfil.fromMap(doc.data()!);
         notifyListeners();
-        return true; // Ya tiene perfil
+        return true;
       } else {
-        return false; // Es nuevo, debe configurar
+        return false;
       }
     } catch (e) {
-      print('Error verificando perfil: $e');
+      print('Error verificando: $e');
       return false;
     } finally {
       _cargando = false;
@@ -33,13 +33,30 @@ class UsuarioProveedor with ChangeNotifier {
     }
   }
 
-  // Guardar o Actualizar el perfil
   Future<void> guardarPerfil(UsuarioPerfil perfil) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
+    final user = FirebaseAuth.instance.currentUser;
+    
+    // 🔥 VALIDACIÓN CRÍTICA: Aseguramos que el UID exista
+    if (user == null || user.uid.isEmpty) {
+      throw 'Error grave: No se pudo identificar al usuario (ID vacío). Cierre sesión e intente de nuevo.';
+    }
 
-    await FirebaseFirestore.instance.collection('usuarios').doc(uid).set(perfil.toMap());
-    _perfilActual = perfil;
-    notifyListeners();
+    // Aseguramos que el perfil tenga el UID correcto antes de guardar
+    perfil.uid = user.uid;
+
+    try {
+      // Usamos set con SetOptions para fusionar si ya existe algo
+      await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(user.uid)
+          .set(perfil.toMap(), SetOptions(merge: true));
+          
+      _perfilActual = perfil;
+      notifyListeners();
+    } catch (e) {
+      // Esto nos dirá exactamente qué pasó si vuelve a fallar
+      print("Error guardando perfil: $e");
+      rethrow; 
+    }
   }
 }

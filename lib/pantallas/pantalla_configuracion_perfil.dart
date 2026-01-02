@@ -29,17 +29,19 @@ class _PantallaConfiguracionPerfilState extends State<PantallaConfiguracionPerfi
   final ImagePicker _picker = ImagePicker();
   bool _guardando = false;
 
+  // 1. COMPRESIÓN AGRESIVA (Para que funcione en celulares con cámaras potentes)
   Future<void> _seleccionarLogo() async {
     final XFile? image = await _picker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 30, // Comprimir para ahorrar espacio
-      maxWidth: 500,    // Logo no necesita ser gigante
+      imageQuality: 25, // Bajamos calidad al 25% (Suficiente para un logo pequeño)
+      maxWidth: 400,    // Ancho máximo 400px (Para que no pese MBs)
     );
     if (image != null) {
       setState(() => _imagenSeleccionada = File(image.path));
     }
   }
 
+  // 2. GUARDADO BLINDADO
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _guardando = true);
@@ -51,35 +53,48 @@ class _PantallaConfiguracionPerfilState extends State<PantallaConfiguracionPerfi
       if (_imagenSeleccionada != null) {
         final bytes = await _imagenSeleccionada!.readAsBytes();
         logoBase64 = 'base64,${base64Encode(bytes)}';
+        
+        // Verificación de seguridad (Opcional, solo para tu tranquilidad)
+        // Si el texto es demasiado largo, Firestore fallará. Con la compresión de arriba
+        // esto no debería pasar, pero es bueno saberlo.
+        if (logoBase64.length > 900000) { 
+           throw 'La imagen es demasiado pesada incluso comprimida. Intenta con otra.';
+        }
       }
 
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
+      if (user == null) throw 'No se encontró sesión activa';
 
       final perfil = UsuarioPerfil(
         uid: user.uid,
         email: user.email ?? '',
         nombreCastadero: _ctrlCastadero.text.trim(),
         nombrePropietario: _ctrlPropietario.text.trim(),
-        telefono: _ctrlTelefono.text.trim(),
-        direccion: _ctrlDireccion.text.trim(),
+        telefono: _ctrlTelefono.text.trim(), // Si está vacío, el Modelo lo convierte a ""
+        direccion: _ctrlDireccion.text.trim(), // Si está vacío, el Modelo lo convierte a ""
         logoPath: logoBase64,
       );
 
       await context.read<UsuarioProveedor>().guardarPerfil(perfil);
 
       if (mounted) {
-        // Redirigir al inicio y borrar historial para que no vuelva aquí con "atrás"
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const PantallaInicio()),
           (route) => false,
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-      setState(() => _guardando = false);
+      // Mostrar el error real en pantalla para saber qué pasa
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error: $e'),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 5),
+      ));
+    } finally {
+      if (mounted) setState(() => _guardando = false);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

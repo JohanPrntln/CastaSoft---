@@ -1,4 +1,4 @@
-import 'dart:convert'; // NECESARIO PARA LEER LA FOTO
+import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -15,11 +15,10 @@ class PantallaDetalleGallo extends StatelessWidget {
 
   // ================= UTILIDADES =================
 
-  // FUNCIÓN PARA EL ZOOM (Pantalla completa) 🔍
   void _mostrarImagenGrande(BuildContext context, ImageProvider imagen) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.9), // Fondo oscuro
+      barrierColor: Colors.black.withOpacity(0.9),
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: EdgeInsets.zero,
@@ -27,7 +26,7 @@ class PantallaDetalleGallo extends StatelessWidget {
           alignment: Alignment.topRight,
           children: [
             Center(
-              child: InteractiveViewer( // Permite pellizcar para zoom
+              child: InteractiveViewer(
                 panEnabled: true,
                 minScale: 0.5,
                 maxScale: 4,
@@ -111,21 +110,15 @@ class PantallaDetalleGallo extends StatelessWidget {
     );
   }
 
-  // 1. ENCABEZADO MEJORADO (GRANDE Y CON ZOOM) ✅
   Widget _buildEncabezado(BuildContext context) {
-    
-    // Lógica inteligente para sacar la imagen (Base64 o File o nada)
     ImageProvider? proveedorImagen;
-    
     if (gallo.fotoPath != null) {
       if (gallo.fotoPath!.startsWith('base64,')) {
-        // Caso A: Es Texto Base64 (Nube gratis)
         try {
           final String base64String = gallo.fotoPath!.split(',').last;
           proveedorImagen = MemoryImage(base64Decode(base64String));
         } catch (e) { print(e); }
       } else {
-        // Caso B: Es Ruta Local (Antiguo / Respaldo)
         File imgFile = File(gallo.fotoPath!);
         if (imgFile.existsSync()) {
           proveedorImagen = FileImage(imgFile);
@@ -147,17 +140,16 @@ class PantallaDetalleGallo extends StatelessWidget {
         children: [
           Hero(
             tag: gallo.id,
-            child: GestureDetector( // DETECTA EL CLICK PARA ZOOM 🔍
+            child: GestureDetector(
               onTap: proveedorImagen != null 
                   ? () => _mostrarImagenGrande(context, proveedorImagen!) 
                   : null,
               child: Container(
-                // 🔥 AQUI CAMBIAMOS EL TAMAÑO A 200 (ANTES ERA 140) 🔥
                 width: 200, 
                 height: 200,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(25), // Bordes más redondeados
+                  borderRadius: BorderRadius.circular(25),
                   border: Border.all(color: Colors.white, width: 4),
                   boxShadow: [const BoxShadow(blurRadius: 15, color: Colors.black38)],
                   image: proveedorImagen != null 
@@ -196,14 +188,13 @@ class PantallaDetalleGallo extends StatelessWidget {
     );
   }
 
-  // ... RESTO DE WIDGETS (IGUAL QUE ANTES) ...
-
   Widget _buildResumenRapido() {
     return Row(
       children: [
         _datoCard(FontAwesomeIcons.calendar, '${_calcularEdadMeses(gallo.fechaNacimiento)} Meses', 'Edad'),
         const SizedBox(width: 10),
-        _datoCard(FontAwesomeIcons.weightScale, '${gallo.pesoActual ?? "--"} Kg', 'Peso'),
+        // 🔥 CAMBIO AQUÍ: Kg -> Lbs
+        _datoCard(FontAwesomeIcons.weightScale, '${gallo.pesoActual ?? "--"} Lbs', 'Peso'),
         const SizedBox(width: 10),
         _datoCard(gallo.sexo == 'Macho' ? FontAwesomeIcons.mars : FontAwesomeIcons.venus, gallo.sexo, 'Sexo'),
       ],
@@ -264,7 +255,8 @@ class PantallaDetalleGallo extends StatelessWidget {
             const SizedBox(height: 15),
             _infoFila('Etapa Vida', gallo.etapaVida),
             _infoFila('Tipo Cresta', gallo.tipoCresta),
-            _infoFila('Peso Combate', '${gallo.pesoCombate ?? "--"} Kg'),
+            // 🔥 CAMBIO AQUÍ: Kg -> Lbs
+            _infoFila('Peso Combate', '${gallo.pesoCombate ?? "--"} Lbs'),
             const Divider(),
             const Text('Vacunas:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
             if (gallo.vacunas.isEmpty) const Text('Sin registro', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
@@ -280,6 +272,11 @@ class PantallaDetalleGallo extends StatelessWidget {
   }
 
   Widget _buildSeccionFinanzasYExtra(BuildContext context) {
+    // FORMATO DE MONEDA PARA VISUALIZACIÓN
+    // Usamos NumberFormat para mostrar el dinero bonito en la tarjeta
+    // Nota: Requiere 'package:intl/intl.dart' (que ya agregamos al proyecto)
+    // Pero si no quieres importar intl aquí, podemos usar toStringAsFixed(0) básico
+    
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -349,7 +346,6 @@ class PantallaDetalleGallo extends StatelessWidget {
     );
   }
 
-  // WIDGETS AUXILIARES
   Widget _datoCard(IconData icon, String valor, String label) {
     return Expanded(
       child: Container(
@@ -418,12 +414,13 @@ class PantallaDetalleGallo extends StatelessWidget {
   }
 
   Widget _datoFinanciero(String label, double? monto, Color color) {
+    // Si tienes intl importado, podrías usar NumberFormat aquí también
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
         Text(
-          monto != null ? '\$${monto.toStringAsFixed(0)}' : '--',
+          monto != null ? '\$${monto.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}' : '--',
           style: GoogleFonts.robotoMono(fontSize: 14, fontWeight: FontWeight.bold, color: color),
         ),
       ],

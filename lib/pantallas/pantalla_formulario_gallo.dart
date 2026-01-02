@@ -1,11 +1,13 @@
-import 'dart:convert'; // Para Base64
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // NECESARIO PARA LOS FORMATTERS
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:intl/intl.dart'; // NECESARIO PARA EL FORMATO DE DINERO
 import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
 
@@ -59,8 +61,6 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   String? _madreId;
   
   bool _esEdicion = false;
-  
-  // Variables FOTO
   File? _imagenNuevaSeleccionada; 
   String? _fotoActualBase64; 
 
@@ -96,7 +96,6 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     _ctrlJaula.text = g.jaula ?? '';
     _ctrlCriadero.text = g.criaderoOrigen;
 
-    // Genealogía texto
     _ctrlNombrePadre.text = g.nombrePadre ?? '';
     _ctrlNombreMadre.text = g.nombreMadre ?? '';
     _ctrlAbueloPaterno.text = g.nombreAbueloPaterno ?? '';
@@ -104,8 +103,15 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     _ctrlAbueloMaterno.text = g.nombreAbueloMaterno ?? '';
     _ctrlAbuelaMaterna.text = g.nombreAbuelaMaterna ?? '';
 
-    _ctrlCosto.text = g.costoAdquisicion?.toString() ?? '';
-    _ctrlVenta.text = g.precioVenta?.toString() ?? '';
+    // 🔥 CARGAR PRECIOS CON EL FORMATO DE PUNTOS
+    final currencyFormat = NumberFormat.currency(locale: 'es_CO', symbol: '', decimalDigits: 0);
+    if (g.costoAdquisicion != null) {
+      _ctrlCosto.text = currencyFormat.format(g.costoAdquisicion).trim();
+    }
+    if (g.precioVenta != null) {
+      _ctrlVenta.text = currencyFormat.format(g.precioVenta).trim();
+    }
+
     _ctrlVideo.text = g.videoUrl ?? '';
     _ctrlNotas.text = g.notas ?? '';
 
@@ -119,8 +125,6 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     _fechaNacimiento = g.fechaNacimiento;
     _padreId = g.padreId;
     _madreId = g.madreId;
-    
-    // FOTO: Guardamos el string base64 si existe
     _fotoActualBase64 = g.fotoPath;
   }
 
@@ -148,33 +152,34 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
 
   String _formatearFecha(DateTime fecha) => '${fecha.day}/${fecha.month}/${fecha.year}';
 
-  // --- SELECCIONAR FOTO (COMPRIMIDA) ---
   Future<void> _seleccionarImagen() async {
     final XFile? image = await _picker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 30, // Calidad 30%
-      maxWidth: 800,    // Ancho máx 800px
+      imageQuality: 30, 
+      maxWidth: 800,    
     );
-    
     if (image != null) {
-      setState(() {
-        _imagenNuevaSeleccionada = File(image.path);
-      });
+      setState(() => _imagenNuevaSeleccionada = File(image.path));
     }
   }
 
+  // 🔥 LIMPIEZA DE NÚMEROS (Quitar puntos antes de guardar)
   double? _limpiarNumero(String valor, {bool esDinero = false}) {
     if (valor.trim().isEmpty) return null;
     String limpio = valor.trim();
+    
     if (esDinero) {
-      limpio = limpio.replaceAll('.', '').replaceAll(',', '.');
+      // Quitamos puntos de mil y el símbolo $ si existe
+      limpio = limpio.replaceAll('.', '').replaceAll('\$', '').replaceAll(' ', '');
+      // Cambiamos coma decimal por punto (por seguridad)
+      limpio = limpio.replaceAll(',', '.');
     } else {
+      // Para peso: aseguramos el punto decimal
       limpio = limpio.replaceAll(',', '.');
     }
     return double.tryParse(limpio);
   }
   
-  // --- GUARDAR (LÓGICA CORREGIDA) ---
   Future<void> _guardar() async {
     if (_fechaNacimiento == null) {
       _mostrarSnack('Selecciona fecha de nacimiento', Colors.red);
@@ -188,13 +193,10 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
       final proveedor = context.read<GallosProveedor>();
       
       String? fotoFinalString;
-
-      // Si seleccionó foto nueva, convertimos a Base64
       if (_imagenNuevaSeleccionada != null) {
         final bytes = await _imagenNuevaSeleccionada!.readAsBytes();
         fotoFinalString = 'base64,${base64Encode(bytes)}';
       } else {
-        // Si no, dejamos la que estaba
         fotoFinalString = widget.galloEditar?.fotoPath;
       }
 
@@ -215,13 +217,16 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         criaderoOrigen: _ctrlCriadero.text.trim().isEmpty ? 'Propio' : _ctrlCriadero.text.trim(),
         jaula: _ctrlJaula.text.isEmpty ? null : _ctrlJaula.text.trim(),
         
+        // GUARDAR PESOS
         pesoActual: _limpiarNumero(_ctrlPesoActual.text, esDinero: false),
         pesoCombate: _limpiarNumero(_ctrlPesoCombate.text, esDinero: false),
+        
+        // GUARDAR DINERO (Limpiando los puntos)
         costoAdquisicion: _limpiarNumero(_ctrlCosto.text, esDinero: true),
         precioVenta: _limpiarNumero(_ctrlVenta.text, esDinero: true),
         
         notas: _ctrlNotas.text.isEmpty ? null : _ctrlNotas.text.trim(),
-        fotoPath: fotoFinalString, // FOTO TEXTO
+        fotoPath: fotoFinalString,
         videoUrl: _ctrlVideo.text.isEmpty ? null : _ctrlVideo.text.trim(),
         
         padreId: _padreId,
@@ -237,7 +242,6 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         peleas: _listaPeleas,
       );
 
-      // CORRECCIÓN AQUÍ: Usamos crear o actualizar según corresponda
       if (_esEdicion) {
         await proveedor.actualizarGallo(gallo);
         _mostrarSnack('Gallo actualizado correctamente', Colors.green);
@@ -288,10 +292,10 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  _buildTabDatos(),      // LLAMADA A FUNCIÓN
-                  _buildTabGenealogia(), // LLAMADA A FUNCIÓN
-                  _buildTabGestion(),    // LLAMADA A FUNCIÓN
-                  _buildTabFinanzas(),   // LLAMADA A FUNCIÓN
+                  _buildTabDatos(),      
+                  _buildTabGenealogia(), 
+                  _buildTabGestion(),    
+                  _buildTabFinanzas(),   
                 ],
               ),
             ),
@@ -304,24 +308,15 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     );
   }
 
-  // ================== PESTAÑAS Y WIDGETS ==================
-
-  // FOTO PICKER INTELIGENTE
   Widget _buildFotoPicker() {
     ImageProvider? imagenMostrar;
-
-    // 1. Si hay foto nueva seleccionada
     if (_imagenNuevaSeleccionada != null) {
       imagenMostrar = FileImage(_imagenNuevaSeleccionada!);
-    } 
-    // 2. Si hay foto antigua en Base64
-    else if (_fotoActualBase64 != null && _fotoActualBase64!.startsWith('base64,')) {
+    } else if (_fotoActualBase64 != null && _fotoActualBase64!.startsWith('base64,')) {
       try {
         final String base64String = _fotoActualBase64!.split(',').last;
         imagenMostrar = MemoryImage(base64Decode(base64String));
-      } catch (e) {
-        print('Error imagen: $e');
-      }
+      } catch (e) { print('Error imagen: $e'); }
     }
 
     return Center(
@@ -386,7 +381,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
 
   // PESTAÑA 2
   Widget _buildTabGenealogia() {
-    final gallos = context.watch<GallosProveedor>().gallos; // Usamos watch para actualizar si cambia
+    final gallos = context.watch<GallosProveedor>().gallos; 
     final padres = gallos.where((g) => g.sexo == 'Macho' && g.id != widget.galloEditar?.id).toList();
     final madres = gallos.where((g) => g.sexo == 'Hembra' && g.id != widget.galloEditar?.id).toList();
 
@@ -431,7 +426,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     );
   }
 
-  // PESTAÑA 3
+  // PESTAÑA 3: GESTIÓN (AQUÍ PONEMOS LIBRAS)
   Widget _buildTabGestion() {
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -444,9 +439,10 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
           ]),
           const SizedBox(height: 15),
           Row(children: [
-            Expanded(child: _buildInput(_ctrlPesoActual, 'Peso Actual (Kg)', isNumber: true, icon: FontAwesomeIcons.weightScale)),
+            // 🔥 CONFIRMADO: USA LBS
+            Expanded(child: _buildInput(_ctrlPesoActual, 'Peso Actual (Lbs)', isNumber: true, icon: FontAwesomeIcons.weightScale)),
             const SizedBox(width: 15),
-            Expanded(child: _buildInput(_ctrlPesoCombate, 'Peso Pactado', isNumber: true, icon: FontAwesomeIcons.dumbbell)),
+            Expanded(child: _buildInput(_ctrlPesoCombate, 'Peso Pactado (Lbs)', isNumber: true, icon: FontAwesomeIcons.dumbbell)),
           ]),
           const SizedBox(height: 15),
           _buildInput(_ctrlJaula, 'Jaula / Ubicación'),
@@ -464,16 +460,17 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     );
   }
 
-  // PESTAÑA 4
+  // PESTAÑA 4: FINANZAS (AQUÍ PONEMOS EL FORMATO DE DINERO)
   Widget _buildTabFinanzas() {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
         _buildCard('Rentabilidad', [
           Row(children: [
-            Expanded(child: _buildInput(_ctrlCosto, 'Costo Adquisición', isNumber: true, icon: Icons.money_off)),
+            // 🔥 CONFIRMADO: USA isMoney: true PARA LOS PUNTOS
+            Expanded(child: _buildInput(_ctrlCosto, 'Costo Adquisición', isNumber: true, isMoney: true, icon: Icons.money_off)),
             const SizedBox(width: 15),
-            Expanded(child: _buildInput(_ctrlVenta, 'Precio Venta', isNumber: true, icon: Icons.attach_money)),
+            Expanded(child: _buildInput(_ctrlVenta, 'Precio Venta', isNumber: true, isMoney: true, icon: Icons.attach_money)),
           ]),
           const SizedBox(height: 15),
           _buildInput(_ctrlCriadero, 'Criadero de Origen'),
@@ -489,7 +486,6 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     );
   }
 
-  // WIDGETS AUXILIARES
   Widget _buildCard(String title, List<Widget> children) {
     return Card(
       elevation: 2,
@@ -506,13 +502,30 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     );
   }
 
-  Widget _buildInput(TextEditingController ctrl, String label, {IconData? icon, bool isNumber = false, bool validacion = false, int maxLines = 1, bool readOnly = false, VoidCallback? onTap}) {
+  // WIDGET INPUT MEJORADO CON FORMATO DE DINERO
+  Widget _buildInput(
+    TextEditingController ctrl, 
+    String label, {
+      IconData? icon, 
+      bool isNumber = false, 
+      bool isMoney = false, // 🔥 DETECCIÓN DE DINERO
+      bool validacion = false, 
+      int maxLines = 1, 
+      bool readOnly = false, 
+      VoidCallback? onTap
+    }) {
     return TextFormField(
       controller: ctrl,
-      keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+      keyboardType: isNumber 
+          ? const TextInputType.numberWithOptions(decimal: true) 
+          : TextInputType.text,
       readOnly: readOnly,
       onTap: onTap,
       maxLines: maxLines,
+      // 🔥 AQUÍ SE APLICA EL FORMATO MÁGICO
+      inputFormatters: isMoney 
+          ? [FilteringTextInputFormatter.digitsOnly, CurrencyInputFormatter()] 
+          : null,
       decoration: _inputDeco(label, icon: icon),
       validator: validacion ? (v) => (v == null || v.isEmpty) ? 'Requerido' : null : null,
     );
@@ -576,5 +589,24 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         _ctrlFecha.text = _formatearFecha(picked);
       });
     }
+  }
+}
+
+// 🔥 CLASE MÁGICA PARA FORMATO DE DINERO (1.000.000)
+class CurrencyInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.selection.baseOffset == 0) {
+      return newValue;
+    }
+
+    double value = double.parse(newValue.text);
+    final formatter = NumberFormat.currency(locale: 'es_CO', symbol: '', decimalDigits: 0);
+    String newText = formatter.format(value).trim();
+
+    return newValue.copyWith(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newText.length),
+    );
   }
 }

@@ -1,8 +1,8 @@
 class UsuarioPerfil {
-  String uid; // El ID único de Firebase
+  String uid;
   String nombrePropietario;
   String nombreCastadero;
-  String? logoPath; // Aquí guardaremos el logo en Base64
+  String? logoPath;
   String? telefono;
   String? direccion;
   String email;
@@ -17,14 +17,15 @@ class UsuarioPerfil {
     required this.email,
   });
 
+  // 🔥 AQUÍ ESTABA EL RIESGO: Vamos a evitar enviar NULLs
   Map<String, dynamic> toMap() {
     return {
       'uid': uid,
       'nombrePropietario': nombrePropietario,
       'nombreCastadero': nombreCastadero,
-      'logoPath': logoPath,
-      'telefono': telefono,
-      'direccion': direccion,
+      'logoPath': logoPath ?? '', // Si es null, envía texto vacío
+      'telefono': telefono ?? '', // Si es null, envía texto vacío
+      'direccion': direccion ?? '', // Si es null, envía texto vacío
       'email': email,
     };
   }
