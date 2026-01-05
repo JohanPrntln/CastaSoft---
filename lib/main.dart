@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // 🔥 IMPORTANTE: Para verificar la sesión
 import 'firebase_options.dart';
 
 // === TUS IMPORTACIONES ===
@@ -13,7 +14,7 @@ import 'package:castasoft/servicios/servicio_firestore.dart';
 
 // === PROVEEDORES ===
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
-import 'package:castasoft/proveedores/usuario_proveedor.dart'; // 🔥 Importación del nuevo proveedor
+import 'package:castasoft/proveedores/usuario_proveedor.dart';
 import 'package:castasoft/proveedores/cruces_proveedor.dart';
 
 void main() async {
@@ -54,13 +55,15 @@ class AplicacionCastaSoft extends StatelessWidget {
           create: (_) => GallosProveedor(),
         ),
 
-        // 🔥 3. NUEVO: Proveedor de Usuario (Para el Logo y Perfil)
-        // Este es el que faltaba agregar en la lista
+        // 3. Proveedor de Usuario (Para el Logo y Perfil)
         ChangeNotifierProvider(
           create: (_) => UsuarioProveedor(),
         ),
+        
         // 4. Proveedor de Cruces
-        ChangeNotifierProvider(create: (_) => CrucesProveedor()),
+        ChangeNotifierProvider(
+          create: (_) => CrucesProveedor()
+        ),
       ],
       child: MaterialApp(
         title: 'CastaSoft',
@@ -105,13 +108,36 @@ class AplicacionCastaSoft extends StatelessWidget {
         ],
         locale: const Locale('es', 'ES'),
 
-        // === RUTAS DE NAVEGACIÓN ===
-        initialRoute: '/login', 
+        // === 🔥 AQUÍ ESTÁ LA LÓGICA DE SESIÓN PERMANENTE 🔥 ===
+        // En lugar de 'initialRoute', usamos 'home' con un StreamBuilder
+        home: StreamBuilder<User?>(
+          stream: FirebaseAuth.instance.authStateChanges(), // Escucha si hay usuario
+          builder: (context, snapshot) {
+            
+            // CASO A: Esperando respuesta de Firebase (Cargando...)
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                backgroundColor: Color(0xFF121212), // Fondo oscuro mientra carga
+                body: Center(
+                  child: CircularProgressIndicator(color: Color(0xFFD4AF37)), // Spinner Dorado
+                ),
+              );
+            }
+
+            // CASO B: ¡Hay usuario! (Sesión activa) -> Manda directo al Inicio
+            if (snapshot.hasData) {
+              return const PantallaInicio(); 
+            }
+
+            // CASO C: No hay usuario (Sesión cerrada) -> Manda al Login
+            return const PantallaLogin();
+          },
+        ),
+
+        // Rutas nombradas (Útiles para navegación interna)
         routes: {
           '/login': (context) => const PantallaLogin(),
           '/inicio': (context) => const PantallaInicio(),
-          // Nota: La pantalla de configuración de perfil la llamamos
-          // dinámicamente desde el Login, no necesitamos ruta nombrada aquí por ahora.
         },
       ),
     );

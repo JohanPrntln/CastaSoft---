@@ -10,9 +10,41 @@ class UsuarioProveedor with ChangeNotifier {
   UsuarioPerfil? get perfil => _perfilActual;
   bool get cargando => _cargando;
 
+  // ==========================================================
+  // 1. 🔥 NUEVO MÉTODO: CARGAR PERFIL
+  // ==========================================================
+  // Este es el que faltaba. Sirve para recuperar los datos
+  // automáticamente cuando reinicias la app (R).
+  Future<void> cargarPerfil() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    
+    // Si no hay usuario, no hacemos nada
+    if (uid == null) {
+      _cargando = false;
+      return;
+    }
+
+    try {
+      final doc = await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
+      
+      if (doc.exists && doc.data() != null) {
+        // Recuperamos los datos de Firebase y actualizamos la memoria
+        _perfilActual = UsuarioPerfil.fromMap(doc.data()!);
+        notifyListeners(); // ¡Avisamos a la pantalla de inicio!
+      }
+    } catch (e) {
+      print('Error cargando perfil: $e');
+    } finally {
+      _cargando = false;
+      notifyListeners();
+    }
+  }
+
+  // ==========================================================
+  // 2. VERIFICAR SI EXISTE (Para el Login)
+  // ==========================================================
   Future<bool> verificarPerfilExistente() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    // Si no hay usuario logueado, retornamos false
     if (uid == null || uid.isEmpty) return false;
 
     try {
@@ -33,28 +65,28 @@ class UsuarioProveedor with ChangeNotifier {
     }
   }
 
+  // ==========================================================
+  // 3. GUARDAR PERFIL
+  // ==========================================================
   Future<void> guardarPerfil(UsuarioPerfil perfil) async {
     final user = FirebaseAuth.instance.currentUser;
     
-    // 🔥 VALIDACIÓN CRÍTICA: Aseguramos que el UID exista
     if (user == null || user.uid.isEmpty) {
       throw 'Error grave: No se pudo identificar al usuario (ID vacío). Cierre sesión e intente de nuevo.';
     }
 
-    // Aseguramos que el perfil tenga el UID correcto antes de guardar
+    // Aseguramos que el perfil tenga el UID correcto
     perfil.uid = user.uid;
 
     try {
-      // Usamos set con SetOptions para fusionar si ya existe algo
       await FirebaseFirestore.instance
           .collection('usuarios')
           .doc(user.uid)
           .set(perfil.toMap(), SetOptions(merge: true));
           
       _perfilActual = perfil;
-      notifyListeners();
+      notifyListeners(); // Actualiza la UI instantáneamente
     } catch (e) {
-      // Esto nos dirá exactamente qué pasó si vuelve a fallar
       print("Error guardando perfil: $e");
       rethrow; 
     }

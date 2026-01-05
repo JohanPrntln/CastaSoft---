@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:provider/provider.dart'; // Importante para acceder al servicio
-import 'package:castasoft/servicios/servicio_firestore.dart'; // Tu servicio real
-import 'package:castasoft/proveedores/usuario_proveedor.dart'; // <--- NUEVO
+import 'package:provider/provider.dart';
+import 'package:castasoft/servicios/servicio_firestore.dart';
+import 'package:castasoft/proveedores/usuario_proveedor.dart';
 import 'package:castasoft/pantallas/pantalla_configuracion_perfil.dart';
 
 class PantallaLogin extends StatefulWidget {
@@ -22,13 +22,21 @@ class _PantallaLoginState extends State<PantallaLogin> {
   String? _mensajeErrorContrasena;
   bool _estaCargando = false;
 
-  // Colores del sistema CastaSoft
-  static const Color _azulMarino = Color(0xFF1E3A8A);
-  static const Color _dorado = Color(0xFFD4AF37);
-  static const Color _blanco = Color(0xFFFFFFFF);
-  static const Color _grisClaro = Color(0xFFF8FAFC);
-  static const Color _grisNeutro = Color(0xFF94A3B8);
-  static const Color _celisteClaro = Color(0xFF0EA5E9);
+  // 🔥 PALETA DE COLORES
+  static const Color _colorFondo = Color(0xFF121212); 
+  static const Color _dorado = Color(0xFFD4AF37); 
+  static const Color _grisOscuro = Color(0xFF2C2C2C); 
+  static const Color _blanco = Colors.white;
+
+  // ============================================================
+  // 🔧 AJUSTE DE POSICIÓN
+  // ============================================================
+  // ⚠️ IMPORTANTE: He puesto esto en 0.0. 
+  // Si pones -50, empujas la cola del gallo fuera de la pantalla.
+  // Déjalo en 0.0 para ver la imagen completa primero.
+  static const double _logoOffsetX = -40.0; 
+  static const double _logoOffsetY = 0.0; 
+  // ============================================================
 
   @override
   void dispose() {
@@ -37,6 +45,7 @@ class _PantallaLoginState extends State<PantallaLogin> {
     super.dispose();
   }
 
+  // --- LÓGICA DE INICIO DE SESIÓN ---
   bool _validarFormulario() {
     setState(() {
       _mensajeErrorUsuario = null;
@@ -44,34 +53,25 @@ class _PantallaLoginState extends State<PantallaLogin> {
     });
 
     bool esValido = true;
-
     if (_controladorUsuario.text.trim().isEmpty) {
-      setState(() => _mensajeErrorUsuario = 'El usuario es requerido');
+      setState(() => _mensajeErrorUsuario = 'Campo requerido');
       esValido = false;
     }
-
     if (_controladorContrasena.text.trim().isEmpty) {
-      setState(() => _mensajeErrorContrasena = 'La contraseña es requerida');
-      esValido = false;
-    } else if (_controladorContrasena.text.length < 6) {
-      setState(() => _mensajeErrorContrasena = 'Mínimo 6 caracteres');
+      setState(() => _mensajeErrorContrasena = 'Campo requerido');
       esValido = false;
     }
-
     return esValido;
   }
 
-Future<void> _iniciarSesion() async {
-    // 1. Ocultar teclado y validar
+  Future<void> _iniciarSesion() async {
     FocusScope.of(context).unfocus();
     if (!_validarFormulario()) return;
 
     setState(() => _estaCargando = true);
 
     try {
-      // 2. Llamar al servicio REAL de Firebase (Autenticación)
       final servicio = context.read<ServicioFirestore>();
-      
       await servicio.iniciarSesion(
         _controladorUsuario.text.trim(),
         _controladorContrasena.text.trim(),
@@ -79,205 +79,245 @@ Future<void> _iniciarSesion() async {
 
       if (!mounted) return;
 
-      // 3. 🔥 VERIFICACIÓN DE PERFIL (LO NUEVO) 🔥
-      // Preguntamos: ¿Este usuario ya tiene logo y nombre de castadero?
       final usuarioProv = context.read<UsuarioProveedor>();
       final bool tienePerfil = await usuarioProv.verificarPerfilExistente();
 
       if (!mounted) return;
 
       if (tienePerfil) {
-        // CASO A: Usuario viejo (Ya configuró todo) -> Va al Inicio
         Navigator.of(context).pushReplacementNamed('/inicio');
       } else {
-        // CASO B: Usuario nuevo (Primera vez) -> Va a Configuración
-        // Nota: Asegúrate de importar la pantalla arriba
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const PantallaConfiguracionPerfil())
         );
       }
-
     } catch (e) {
       if (!mounted) return;
-      
       setState(() => _estaCargando = false);
       
-      // Mensaje de error amigable
-      String mensajeError = 'Error de conexión o datos incorrectos';
-      if (e.toString().contains('user-not-found')) mensajeError = 'Usuario no encontrado';
-      if (e.toString().contains('wrong-password')) mensajeError = 'Contraseña incorrecta';
-      if (e.toString().contains('invalid-credential')) mensajeError = 'Credenciales inválidas';
+      String mensaje = 'Error de acceso';
+      if (e.toString().contains('user-not-found') || e.toString().contains('wrong-password') || e.toString().contains('invalid-credential')) {
+        mensaje = 'Usuario o contraseña incorrectos';
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Row(
-            children: [
-              const Icon(Icons.error_outline, color: Colors.white),
-              const SizedBox(width: 10),
-              Expanded(child: Text(mensajeError)),
-            ],
-          ),
-          backgroundColor: Colors.red.shade700,
+          content: Row(children: [const Icon(Icons.error, color: Colors.white), const SizedBox(width: 10), Expanded(child: Text(mensaje))]),
+          backgroundColor: Colors.red.shade900,
           behavior: SnackBarBehavior.floating,
         ),
       );
     }
   }
 
+  // --- POPUP INFO ---
+  void _mostrarInfoSoporte() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: _dorado, width: 1)),
+        title: Column(
+          children: [
+            Icon(FontAwesomeIcons.circleInfo, color: _dorado, size: 40),
+            const SizedBox(height: 10),
+            Text('CastaSoft Info', style: GoogleFonts.poppins(color: _blanco, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Divider(color: Colors.grey),
+            const SizedBox(height: 10),
+            Text('PROPIEDAD DE: JORGE AGUDELO', style: TextStyle(color: _dorado, fontSize: 10, letterSpacing: 1.5)),
+            Text('CRIADERO GALLO ALEGRE', style: GoogleFonts.poppins(color: _blanco, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 5),
+            const Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(FontAwesomeIcons.whatsapp, color: Colors.green, size: 16), SizedBox(width: 5), Text('+57 316 5326838', style: TextStyle(color: Colors.grey))]),
+            const SizedBox(height: 20),
+            Text('DESARROLLADO POR:', style: TextStyle(color: _dorado, fontSize: 10, letterSpacing: 1.5)),
+            Text('JOHAN CRUZ', style: GoogleFonts.poppins(color: _blanco, fontWeight: FontWeight.bold)),
+            const Text('DESARROLLADOR DE SOFTWARE', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            const SizedBox(height: 5),
+            const Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(FontAwesomeIcons.code, color: Colors.blue, size: 16), SizedBox(width: 5), Text('Soporte Técnico', style: TextStyle(color: Colors.grey))]),
+          ],
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cerrar', style: TextStyle(color: _dorado)))],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // El diseño visual se mantiene idéntico, solo cambiamos la lógica de arriba.
-    // ... (El resto de tu código de UI sigue igual, usa el que tenías o copia este si prefieres) ...
+    // Usamos LayoutBuilder para saber el alto de la pantalla y ajustar si es necesario
     return Scaffold(
-      body: Stack(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: const Alignment(0.5, -0.3),
-                radius: 1.5,
-                colors: [
-                  _azulMarino.withOpacity(0.9),
-                  _azulMarino,
-                  const Color(0xFF0F172A),
-                ],
-              ),
-            ),
-          ),
-          SingleChildScrollView(
-            child: SizedBox(
-              height: MediaQuery.of(context).size.height,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      _construirEncabezado(),
-                      const SizedBox(height: 50),
-                      _construirTarjetaLogin(),
-                    ],
-                  ),
+      backgroundColor: _colorFondo,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return Center(
+              child: SingleChildScrollView(
+                // Esto permite scroll solo si la pantalla es MUY pequeña (celular antiguo),
+                // pero en PC/Tablet se verá todo junto.
+                padding: const EdgeInsets.symmetric(horizontal: 30.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    
+                    // 1. LOGO (Tamaño ajustado para que no ocupe toda la vertical)
+                    _construirLogo(),
+                    
+                    // Espacio reducido (Antes era 30)
+                    const SizedBox(height: 10),
+
+                    Text(
+                      'Acceso Privado',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold, color: _blanco),
+                    ),
+                    Text(
+                      'Sistema de Gestión Genética',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey),
+                    ),
+
+                    // Espacio reducido (Antes era 40)
+                    const SizedBox(height: 25),
+
+                    // 2. FORMULARIO COMPACTO
+                    Container(
+                      constraints: const BoxConstraints(maxWidth: 400), // Un poco más angosto para elegancia
+                      child: Column(
+                        children: [
+                          _construirCampoUsuario(),
+                          // Espacio reducido entre inputs (Antes era 20)
+                          const SizedBox(height: 15), 
+                          _construirCampoContrasena(),
+                          
+                          // Espacio reducido antes del botón (Antes era 40)
+                          const SizedBox(height: 25), 
+                          
+                          _construirBotonIniciarSesion(),
+                        ],
+                      ),
+                    ),
+
+                    // Espacio reducido antes del footer (Antes era 50)
+                    const SizedBox(height: 30),
+
+                    // 3. FOOTER
+                    Column(
+                      children: [
+                        Text(
+                          '© 2026 CastaSoft - Derechos Reservados',
+                          style: GoogleFonts.poppins(color: Colors.grey.shade700, fontSize: 11),
+                        ),
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: _mostrarInfoSoporte,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: _dorado.withOpacity(0.3)),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.help_outline, color: _dorado, size: 12),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Información y Soporte',
+                                  style: GoogleFonts.poppins(color: _dorado, fontSize: 11, fontWeight: FontWeight.w500),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
-        ],
+            );
+          }
+        ),
       ),
     );
   }
 
-  Widget _construirEncabezado() {
-    return Column(
-      children: [
-        Container(
-          width: 160,
-          height: 160,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(color: _dorado.withOpacity(0.5), blurRadius: 50, spreadRadius: 20),
-              BoxShadow(color: _dorado.withOpacity(0.25), blurRadius: 80, spreadRadius: 35),
-            ],
-          ),
-          child: Image.asset('assets/pluma_login-removebg-preview.png', fit: BoxFit.contain),
+  Widget _construirLogo() {
+    return Transform.translate(
+      offset: const Offset(_logoOffsetX, _logoOffsetY),
+      child: Container(
+        // 🔥 AJUSTE: Limitamos la altura a 280px para dejar espacio a lo demás
+        constraints: const BoxConstraints(maxHeight: 280, maxWidth: 600),
+        child: Image.asset(
+          'assets/logo_login_final.jpg',
+          fit: BoxFit.contain, // Esto asegura que la cola NO se corte
         ),
-        const SizedBox(height: 50),
-        Text(
-          'Bienvenido a CastaSoft',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(fontSize: 32, fontWeight: FontWeight.bold, color: _blanco, letterSpacing: -0.5),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'Gestión Genética de Élite',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500, color: _dorado, letterSpacing: 2.0),
-        ),
-      ],
-    );
-  }
-
-  Widget _construirTarjetaLogin() {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 420),
-      decoration: BoxDecoration(
-        color: _blanco,
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 20, offset: const Offset(0, 10)),
-        ],
-      ),
-      padding: const EdgeInsets.all(30),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _construirCampoUsuario(),
-          const SizedBox(height: 24),
-          _construirCampoContrasena(),
-          const SizedBox(height: 32),
-          _construirBotonIniciarSesion(),
-          const SizedBox(height: 20),
-          Center(
-            child: Text(
-              '¿Olvidaste tu contraseña?',
-              style: GoogleFonts.poppins(fontSize: 13, color: _celisteClaro, decoration: TextDecoration.underline, fontWeight: FontWeight.w500),
-            ),
-          ),
-        ],
       ),
     );
   }
 
   Widget _construirCampoUsuario() {
-    return TextFormField(
+    return TextField(
       controller: _controladorUsuario,
+      style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
-        hintText: 'Ingresa tu usuario o correo',
-        hintStyle: GoogleFonts.poppins(fontSize: 13, color: _grisNeutro.withOpacity(0.5)),
-        prefixIcon: const Padding(padding: EdgeInsets.only(left: 14, right: 10), child: Icon(FontAwesomeIcons.user, size: 16, color: _dorado)),
         filled: true,
-        fillColor: _grisClaro,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        fillColor: _grisOscuro,
+        hintText: 'Usuario Asignado',
+        hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14), // Texto un poco más pequeño
+        prefixIcon: const Icon(FontAwesomeIcons.user, color: _dorado, size: 16),
         errorText: _mensajeErrorUsuario,
+        contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20), // Input más compacto
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _dorado)),
       ),
-      style: GoogleFonts.poppins(fontSize: 13, color: _azulMarino, fontWeight: FontWeight.w500),
     );
   }
 
   Widget _construirCampoContrasena() {
-    return TextFormField(
+    return TextField(
       controller: _controladorContrasena,
       obscureText: !_mostrarContrasena,
+      style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
-        hintText: 'Ingresa tu contraseña',
-        hintStyle: GoogleFonts.poppins(fontSize: 13, color: _grisNeutro.withOpacity(0.5)),
-        prefixIcon: const Padding(padding: EdgeInsets.only(left: 14, right: 10), child: Icon(FontAwesomeIcons.lock, size: 16, color: _dorado)),
-        suffixIcon: GestureDetector(
-          onTap: () => setState(() => _mostrarContrasena = !_mostrarContrasena),
-          child: Padding(padding: const EdgeInsets.only(right: 14), child: Icon(_mostrarContrasena ? FontAwesomeIcons.eye : FontAwesomeIcons.eyeSlash, size: 16, color: _grisNeutro.withOpacity(0.6))),
-        ),
         filled: true,
-        fillColor: _grisClaro,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        fillColor: _grisOscuro,
+        hintText: 'Contraseña',
+        hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+        prefixIcon: const Icon(FontAwesomeIcons.lock, color: _dorado, size: 16),
+        suffixIcon: IconButton(
+          icon: Icon(_mostrarContrasena ? Icons.visibility : Icons.visibility_off, color: Colors.grey, size: 18),
+          onPressed: () => setState(() => _mostrarContrasena = !_mostrarContrasena),
+        ),
         errorText: _mensajeErrorContrasena,
+        contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _dorado)),
       ),
-      style: GoogleFonts.poppins(fontSize: 13, color: _azulMarino, fontWeight: FontWeight.w500),
     );
   }
 
   Widget _construirBotonIniciarSesion() {
-    return ElevatedButton(
-      onPressed: _estaCargando ? null : _iniciarSesion,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: _dorado,
-        shape: const StadiumBorder(),
-        padding: const EdgeInsets.symmetric(vertical: 15),
+    return SizedBox(
+      width: double.infinity,
+      height: 48, // Botón un poco menos alto (Antes 55)
+      child: ElevatedButton(
+        onPressed: _estaCargando ? null : _iniciarSesion,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _dorado,
+          foregroundColor: Colors.black,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          elevation: 5,
+          shadowColor: _dorado.withOpacity(0.4),
+        ),
+        child: _estaCargando
+            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))
+            : Text('ACCEDER AL SISTEMA', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold)),
       ),
-      child: _estaCargando
-          ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(_azulMarino.withOpacity(0.9)), strokeWidth: 2.5))
-          : Text('Iniciar Sesión', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: _azulMarino)),
     );
   }
 }

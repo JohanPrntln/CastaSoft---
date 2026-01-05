@@ -92,6 +92,7 @@ flutter:
     - assets/images/
     - assets/logo_texto_castasoft_sf.png
     - assets/pluma_login-removebg-preview.png
+    - assets/logo_login_final.jpg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
