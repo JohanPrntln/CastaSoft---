@@ -1,13 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // NECESARIO PARA LOS FORMATTERS
+import 'package:flutter/services.dart'; 
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:intl/intl.dart'; // NECESARIO PARA EL FORMATO DE DINERO
+import 'package:intl/intl.dart'; 
 import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
 
@@ -103,7 +103,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     _ctrlAbueloMaterno.text = g.nombreAbueloMaterno ?? '';
     _ctrlAbuelaMaterna.text = g.nombreAbuelaMaterna ?? '';
 
-    // 🔥 CARGAR PRECIOS CON EL FORMATO DE PUNTOS
+    // CARGAR PRECIOS
     final currencyFormat = NumberFormat.currency(locale: 'es_CO', symbol: '', decimalDigits: 0);
     if (g.costoAdquisicion != null) {
       _ctrlCosto.text = currencyFormat.format(g.costoAdquisicion).trim();
@@ -163,18 +163,13 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     }
   }
 
-  // 🔥 LIMPIEZA DE NÚMEROS (Quitar puntos antes de guardar)
   double? _limpiarNumero(String valor, {bool esDinero = false}) {
     if (valor.trim().isEmpty) return null;
     String limpio = valor.trim();
-    
     if (esDinero) {
-      // Quitamos puntos de mil y el símbolo $ si existe
       limpio = limpio.replaceAll('.', '').replaceAll('\$', '').replaceAll(' ', '');
-      // Cambiamos coma decimal por punto (por seguridad)
       limpio = limpio.replaceAll(',', '.');
     } else {
-      // Para peso: aseguramos el punto decimal
       limpio = limpio.replaceAll(',', '.');
     }
     return double.tryParse(limpio);
@@ -217,11 +212,9 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         criaderoOrigen: _ctrlCriadero.text.trim().isEmpty ? 'Propio' : _ctrlCriadero.text.trim(),
         jaula: _ctrlJaula.text.isEmpty ? null : _ctrlJaula.text.trim(),
         
-        // GUARDAR PESOS
         pesoActual: _limpiarNumero(_ctrlPesoActual.text, esDinero: false),
         pesoCombate: _limpiarNumero(_ctrlPesoCombate.text, esDinero: false),
         
-        // GUARDAR DINERO (Limpiando los puntos)
         costoAdquisicion: _limpiarNumero(_ctrlCosto.text, esDinero: true),
         precioVenta: _limpiarNumero(_ctrlVenta.text, esDinero: true),
         
@@ -263,8 +256,6 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msj), backgroundColor: color));
   }
 
-  // ================== VISTA PRINCIPAL ==================
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -277,6 +268,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
           indicatorWeight: 4,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
+          isScrollable: true, // 🔥 Permite scroll si la pantalla es muy angosta
           tabs: const [
             Tab(icon: Icon(FontAwesomeIcons.kiwiBird), text: 'Datos'),
             Tab(icon: Icon(FontAwesomeIcons.sitemap), text: 'Genealogía'),
@@ -340,6 +332,33 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     );
   }
 
+  // 🔥 WIDGET RESPONSIVO INTELIGENTE
+  // Si la pantalla es ancha, pone los inputs en Fila. Si es angosta, en Columna.
+  Widget _buildResponsiveDualInput(Widget input1, Widget input2) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 350) { // Si hay menos de 350px de ancho
+          return Column(
+            children: [
+              input1,
+              const SizedBox(height: 15),
+              input2,
+            ],
+          );
+        } else {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: input1),
+              const SizedBox(width: 15),
+              Expanded(child: input2),
+            ],
+          );
+        }
+      },
+    );
+  }
+
   // PESTAÑA 1
   Widget _buildTabDatos() {
     return ListView(
@@ -348,31 +367,27 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         _buildFotoPicker(),
         const SizedBox(height: 20),
         _buildCard('Identificación', [
-          Row(children: [
-            Expanded(child: _buildInput(_ctrlPlaca, 'Placa / Anillo', icon: FontAwesomeIcons.tag, validacion: true)),
-            const SizedBox(width: 15),
-            Expanded(child: _buildInput(_ctrlNombre, 'Nombre', icon: FontAwesomeIcons.signature, validacion: true)),
-          ]),
+          _buildResponsiveDualInput(
+            _buildInput(_ctrlPlaca, 'Placa / Anillo', icon: FontAwesomeIcons.tag, validacion: true),
+            _buildInput(_ctrlNombre, 'Nombre', icon: FontAwesomeIcons.signature, validacion: true)
+          ),
           const SizedBox(height: 15),
-          Row(children: [
-            Expanded(child: _buildDropdown('Sexo', ['Macho', 'Hembra'], _sexo, (v) => setState(() => _sexo = v))),
-            const SizedBox(width: 15),
-            Expanded(child: _buildInput(_ctrlFecha, 'Fec. Nacimiento', icon: FontAwesomeIcons.calendar, readOnly: true, onTap: _seleccionarFecha)),
-          ]),
+          _buildResponsiveDualInput(
+            _buildDropdown('Sexo', ['Macho', 'Hembra'], _sexo, (v) => setState(() => _sexo = v)),
+            _buildInput(_ctrlFecha, 'Fec. Nacimiento', icon: FontAwesomeIcons.calendar, readOnly: true, onTap: _seleccionarFecha)
+          ),
         ]),
         const SizedBox(height: 15),
         _buildCard('Genética y Físico', [
-          Row(children: [
-            Expanded(child: _buildInput(_ctrlLinea, 'Línea Genética', icon: FontAwesomeIcons.dna, validacion: true)),
-            const SizedBox(width: 15),
-            Expanded(child: _buildInput(_ctrlColor, 'Color Pluma', icon: FontAwesomeIcons.palette, validacion: true)),
-          ]),
+          _buildResponsiveDualInput(
+            _buildInput(_ctrlLinea, 'Línea Genética', icon: FontAwesomeIcons.dna, validacion: true),
+            _buildInput(_ctrlColor, 'Color Pluma', icon: FontAwesomeIcons.palette, validacion: true)
+          ),
           const SizedBox(height: 15),
-          Row(children: [
-            Expanded(child: _buildDropdown('Cresta', ['Sierra', 'Rosa', 'Pava', 'Boton', 'Simple'], _tipoCresta, (v) => setState(() => _tipoCresta = v))),
-            const SizedBox(width: 15),
-            Expanded(child: _buildInput(_ctrlFase, 'Fase Lunar', icon: FontAwesomeIcons.moon, validacion: true)),
-          ]),
+          _buildResponsiveDualInput(
+            _buildDropdown('Cresta', ['Sierra', 'Rosa', 'Pava', 'Boton', 'Simple'], _tipoCresta, (v) => setState(() => _tipoCresta = v)),
+            _buildInput(_ctrlFase, 'Fase Lunar', icon: FontAwesomeIcons.moon, validacion: true)
+          ),
         ]),
         const SizedBox(height: 60), 
       ],
@@ -390,15 +405,17 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
       children: [
         _buildCard('Padres en el Sistema', [
           DropdownButtonFormField<String>(
+            isExpanded: true, // Evita desbordamiento en texto largo
             value: _padreId,
-            items: padres.map((g) => DropdownMenuItem(value: g.id, child: Text('${g.nombre} (${g.placa})'))).toList(),
+            items: padres.map((g) => DropdownMenuItem(value: g.id, child: Text('${g.nombre} (${g.placa})', overflow: TextOverflow.ellipsis))).toList(),
             onChanged: (v) => setState(() => _padreId = v),
             decoration: _inputDeco('Padre (Macho)'),
           ),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
+            isExpanded: true,
             value: _madreId,
-            items: madres.map((g) => DropdownMenuItem(value: g.id, child: Text('${g.nombre} (${g.placa})'))).toList(),
+            items: madres.map((g) => DropdownMenuItem(value: g.id, child: Text('${g.nombre} (${g.placa})', overflow: TextOverflow.ellipsis))).toList(),
             onChanged: (v) => setState(() => _madreId = v),
             decoration: _inputDeco('Madre (Hembra)'),
           ),
@@ -407,43 +424,38 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         _buildCard('Árbol Genealógico Texto', [
           _buildInput(_ctrlNombrePadre, 'Nombre del Padre'),
           const SizedBox(height: 10),
-          Row(children: [
-            Expanded(child: _buildInput(_ctrlAbueloPaterno, 'Abuelo Paterno')),
-            const SizedBox(width: 10),
-            Expanded(child: _buildInput(_ctrlAbuelaPaterna, 'Abuela Paterna')),
-          ]),
+          _buildResponsiveDualInput(
+            _buildInput(_ctrlAbueloPaterno, 'Abuelo Paterno'),
+            _buildInput(_ctrlAbuelaPaterna, 'Abuela Paterna')
+          ),
           const Divider(height: 20),
           _buildInput(_ctrlNombreMadre, 'Nombre de la Madre'),
           const SizedBox(height: 10),
-          Row(children: [
-            Expanded(child: _buildInput(_ctrlAbueloMaterno, 'Abuelo Materno')),
-            const SizedBox(width: 10),
-            Expanded(child: _buildInput(_ctrlAbuelaMaterna, 'Abuela Materna')),
-          ]),
+          _buildResponsiveDualInput(
+            _buildInput(_ctrlAbueloMaterno, 'Abuelo Materno'),
+            _buildInput(_ctrlAbuelaMaterna, 'Abuela Materna')
+          ),
         ]),
         const SizedBox(height: 60),
       ],
     );
   }
 
-  // PESTAÑA 3: GESTIÓN (AQUÍ PONEMOS LIBRAS)
+  // PESTAÑA 3
   Widget _buildTabGestion() {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
         _buildCard('Estado Actual', [
-          Row(children: [
-            Expanded(child: _buildDropdown('Estado', ['Activo', 'Vendido', 'Baja', 'Retirado'], _estado, (v) => setState(() => _estado = v))),
-            const SizedBox(width: 15),
-            Expanded(child: _buildDropdown('Etapa', ['Cría', 'Levante', 'Muda', 'Postura', 'Padrote'], _etapaVida, (v) => setState(() => _etapaVida = v))),
-          ]),
+          _buildResponsiveDualInput(
+            _buildDropdown('Estado', ['Activo', 'Vendido', 'Baja', 'Retirado'], _estado, (v) => setState(() => _estado = v)),
+            _buildDropdown('Etapa', ['Cría', 'Levante', 'Muda', 'Postura', 'Padrote'], _etapaVida, (v) => setState(() => _etapaVida = v))
+          ),
           const SizedBox(height: 15),
-          Row(children: [
-            // 🔥 CONFIRMADO: USA LBS
-            Expanded(child: _buildInput(_ctrlPesoActual, 'Peso Actual (Lbs)', isNumber: true, icon: FontAwesomeIcons.weightScale)),
-            const SizedBox(width: 15),
-            Expanded(child: _buildInput(_ctrlPesoCombate, 'Peso Pactado (Lbs)', isNumber: true, icon: FontAwesomeIcons.dumbbell)),
-          ]),
+          _buildResponsiveDualInput(
+            _buildInput(_ctrlPesoActual, 'Peso Actual (Lbs)', isNumber: true, icon: FontAwesomeIcons.weightScale),
+            _buildInput(_ctrlPesoCombate, 'Peso Pactado (Lbs)', isNumber: true, icon: FontAwesomeIcons.dumbbell)
+          ),
           const SizedBox(height: 15),
           _buildInput(_ctrlJaula, 'Jaula / Ubicación'),
         ]),
@@ -460,18 +472,16 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     );
   }
 
-  // PESTAÑA 4: FINANZAS (AQUÍ PONEMOS EL FORMATO DE DINERO)
+  // PESTAÑA 4
   Widget _buildTabFinanzas() {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
         _buildCard('Rentabilidad', [
-          Row(children: [
-            // 🔥 CONFIRMADO: USA isMoney: true PARA LOS PUNTOS
-            Expanded(child: _buildInput(_ctrlCosto, 'Costo Adquisición', isNumber: true, isMoney: true, icon: Icons.money_off)),
-            const SizedBox(width: 15),
-            Expanded(child: _buildInput(_ctrlVenta, 'Precio Venta', isNumber: true, isMoney: true, icon: Icons.attach_money)),
-          ]),
+          _buildResponsiveDualInput(
+            _buildInput(_ctrlCosto, 'Costo Adquisición', isNumber: true, isMoney: true, icon: Icons.money_off),
+            _buildInput(_ctrlVenta, 'Precio Venta', isNumber: true, isMoney: true, icon: Icons.attach_money)
+          ),
           const SizedBox(height: 15),
           _buildInput(_ctrlCriadero, 'Criadero de Origen'),
         ]),
@@ -502,13 +512,12 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     );
   }
 
-  // WIDGET INPUT MEJORADO CON FORMATO DE DINERO
   Widget _buildInput(
     TextEditingController ctrl, 
     String label, {
       IconData? icon, 
       bool isNumber = false, 
-      bool isMoney = false, // 🔥 DETECCIÓN DE DINERO
+      bool isMoney = false, 
       bool validacion = false, 
       int maxLines = 1, 
       bool readOnly = false, 
@@ -522,7 +531,6 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
       readOnly: readOnly,
       onTap: onTap,
       maxLines: maxLines,
-      // 🔥 AQUÍ SE APLICA EL FORMATO MÁGICO
       inputFormatters: isMoney 
           ? [FilteringTextInputFormatter.digitsOnly, CurrencyInputFormatter()] 
           : null,
@@ -534,6 +542,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   InputDecoration _inputDeco(String label, {IconData? icon}) {
     return InputDecoration(
       labelText: label,
+      labelStyle: const TextStyle(fontSize: 13), // 🔥 Texto un poco más pequeño para que quepa mejor
       prefixIcon: icon != null ? Icon(icon, size: 18, color: const Color(0xFF1E3A8A)) : null,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
@@ -542,9 +551,10 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
 
   Widget _buildDropdown(String label, List<String> items, String? valor, Function(String?) onChanged) {
     return DropdownButtonFormField<String>(
+      isExpanded: true, // 🔥 Evita error si la opción es muy larga
       value: valor,
       decoration: _inputDeco(label),
-      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 14)))).toList(),
       onChanged: onChanged,
     );
   }
@@ -592,7 +602,6 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   }
 }
 
-// 🔥 CLASE MÁGICA PARA FORMATO DE DINERO (1.000.000)
 class CurrencyInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {

@@ -499,10 +499,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
   Widget _buildTarjetaModuloCruces() {
     return InkWell(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const PantallaListaCruces()),
-        );
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const PantallaListaCruces()));
       },
       borderRadius: BorderRadius.circular(20),
       child: Container(
@@ -510,51 +507,44 @@ class _PantallaInicioState extends State<PantallaInicio> {
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF059669), Color(0xFF34D399)],
+            colors: [Color(0xFF059669), Color(0xFF34D399)], 
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF059669).withOpacity(0.4),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
+            BoxShadow(color: const Color(0xFF059669).withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4)),
           ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Cruces y Genética',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+            // 🔥 CAMBIO CLAVE: Expanded atrapa el texto para que no empuje
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Cruces y Genética',
+                    style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                ),
-                const SizedBox(height: 5),
-                const Text(
-                  'Gestiona camadas, padres y nacimientos',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ],
+                  const SizedBox(height: 5),
+                  // 🔥 CAMBIO CLAVE: Agregamos overflow para cortar si es muy largo
+                  Text(
+                    'Gestiona camadas, padres y nacimientos',
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    overflow: TextOverflow.ellipsis, // Pone "..." si no cabe
+                    maxLines: 2, // Permite que baje máximo a 2 renglones
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(width: 15), // Un respiro entre texto e icono
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                FontAwesomeIcons.dna,
-                color: Colors.white,
-                size: 24,
-              ),
+              decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+              // El icono ahora nunca se saldrá
+              child: const Icon(FontAwesomeIcons.dna, color: Colors.white, size: 24),
             ),
           ],
         ),

@@ -28,16 +28,6 @@ class _PantallaLoginState extends State<PantallaLogin> {
   static const Color _grisOscuro = Color(0xFF2C2C2C); 
   static const Color _blanco = Colors.white;
 
-  // ============================================================
-  // 🔧 AJUSTE DE POSICIÓN
-  // ============================================================
-  // ⚠️ IMPORTANTE: He puesto esto en 0.0. 
-  // Si pones -50, empujas la cola del gallo fuera de la pantalla.
-  // Déjalo en 0.0 para ver la imagen completa primero.
-  static const double _logoOffsetX = -40.0; 
-  static const double _logoOffsetY = 0.0; 
-  // ============================================================
-
   @override
   void dispose() {
     _controladorUsuario.dispose();
@@ -148,7 +138,6 @@ class _PantallaLoginState extends State<PantallaLogin> {
 
   @override
   Widget build(BuildContext context) {
-    // Usamos LayoutBuilder para saber el alto de la pantalla y ajustar si es necesario
     return Scaffold(
       backgroundColor: _colorFondo,
       body: SafeArea(
@@ -156,18 +145,15 @@ class _PantallaLoginState extends State<PantallaLogin> {
           builder: (context, constraints) {
             return Center(
               child: SingleChildScrollView(
-                // Esto permite scroll solo si la pantalla es MUY pequeña (celular antiguo),
-                // pero en PC/Tablet se verá todo junto.
                 padding: const EdgeInsets.symmetric(horizontal: 30.0),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     
-                    // 1. LOGO (Tamaño ajustado para que no ocupe toda la vertical)
+                    // 1. LOGO CORREGIDO (Sin offsets raros)
                     _construirLogo(),
                     
-                    // Espacio reducido (Antes era 30)
                     const SizedBox(height: 10),
 
                     Text(
@@ -181,28 +167,22 @@ class _PantallaLoginState extends State<PantallaLogin> {
                       style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey),
                     ),
 
-                    // Espacio reducido (Antes era 40)
                     const SizedBox(height: 25),
 
                     // 2. FORMULARIO COMPACTO
                     Container(
-                      constraints: const BoxConstraints(maxWidth: 400), // Un poco más angosto para elegancia
+                      constraints: const BoxConstraints(maxWidth: 400),
                       child: Column(
                         children: [
                           _construirCampoUsuario(),
-                          // Espacio reducido entre inputs (Antes era 20)
                           const SizedBox(height: 15), 
                           _construirCampoContrasena(),
-                          
-                          // Espacio reducido antes del botón (Antes era 40)
                           const SizedBox(height: 25), 
-                          
                           _construirBotonIniciarSesion(),
                         ],
                       ),
                     ),
 
-                    // Espacio reducido antes del footer (Antes era 50)
                     const SizedBox(height: 30),
 
                     // 3. FOOTER
@@ -246,16 +226,15 @@ class _PantallaLoginState extends State<PantallaLogin> {
     );
   }
 
+  // ✅ LOGO LIMPIO Y RESPONSIVE
   Widget _construirLogo() {
-    return Transform.translate(
-      offset: const Offset(_logoOffsetX, _logoOffsetY),
-      child: Container(
-        // 🔥 AJUSTE: Limitamos la altura a 280px para dejar espacio a lo demás
-        constraints: const BoxConstraints(maxHeight: 280, maxWidth: 600),
-        child: Image.asset(
-          'assets/logo_login_final.jpg',
-          fit: BoxFit.contain, // Esto asegura que la cola NO se corte
-        ),
+    return Container(
+      // Usamos constraints para que no crezca infinito en tablets
+      constraints: const BoxConstraints(maxHeight: 280, maxWidth: 600),
+      alignment: Alignment.center, // 🔥 Esto asegura que esté centrado
+      child: Image.asset(
+        'assets/logo_login_final.jpg',
+        fit: BoxFit.contain, // Ajusta la imagen dentro del espacio sin cortarla
       ),
     );
   }
@@ -268,10 +247,10 @@ class _PantallaLoginState extends State<PantallaLogin> {
         filled: true,
         fillColor: _grisOscuro,
         hintText: 'Usuario Asignado',
-        hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14), // Texto un poco más pequeño
+        hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
         prefixIcon: const Icon(FontAwesomeIcons.user, color: _dorado, size: 16),
         errorText: _mensajeErrorUsuario,
-        contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20), // Input más compacto
+        contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: _dorado)),
       ),
@@ -304,7 +283,7 @@ class _PantallaLoginState extends State<PantallaLogin> {
   Widget _construirBotonIniciarSesion() {
     return SizedBox(
       width: double.infinity,
-      height: 48, // Botón un poco menos alto (Antes 55)
+      height: 48,
       child: ElevatedButton(
         onPressed: _estaCargando ? null : _iniciarSesion,
         style: ElevatedButton.styleFrom(

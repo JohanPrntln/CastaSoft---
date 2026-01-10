@@ -18,6 +18,29 @@ class TarjetaGallo extends StatelessWidget {
     this.onDelete,
   }) : super(key: key);
 
+  // --- 🔥 LÓGICA DE EDAD (AÑOS Y MESES) ---
+  String _calcularEdadBonita(DateTime nacimiento) {
+    final ahora = DateTime.now();
+    int anos = ahora.year - nacimiento.year;
+    int meses = ahora.month - nacimiento.month;
+    int dias = ahora.day - nacimiento.day;
+
+    if (meses < 0 || (meses == 0 && dias < 0)) {
+      anos--;
+      meses += 12;
+    }
+    
+    // Ajuste fino de días
+    if (dias < 0) {
+      meses--;
+      if (meses < 0) meses += 12;
+    }
+
+    if (anos == 0) return '$meses meses';
+    if (meses == 0) return '$anos años';
+    return '$anos años, $meses m';
+  }
+
   void _mostrarImagenGrande(BuildContext context, ImageProvider imagen) {
     showDialog(
       context: context,
@@ -86,8 +109,8 @@ class TarjetaGallo extends StatelessWidget {
                   ? () => _mostrarImagenGrande(context, proveedorImagen!) 
                   : null,
               child: Container(
-                width: 100, 
-                height: 100,
+                width: 90, // Un poco más pequeña para dar espacio en celulares chicos
+                height: 90,
                 decoration: BoxDecoration(
                   color: const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(12),
@@ -102,14 +125,14 @@ class TarjetaGallo extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(width: 16),
+            const SizedBox(width: 12),
 
-            // === DETALLES ===
+            // === DETALLES (RESPONSIVE) ===
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Título y Menú
+                  // Título y Estado
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -122,9 +145,10 @@ class TarjetaGallo extends StatelessWidget {
                             color: const Color(0xFF0F172A),
                           ),
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          overflow: TextOverflow.ellipsis, // 🔥 Corta si es muy largo
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
@@ -142,22 +166,49 @@ class TarjetaGallo extends StatelessWidget {
                       ),
                     ],
                   ),
+
+                  // 🔥 NUEVO: EDAD CALCULADA
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(FontAwesomeIcons.cakeCandles, size: 10, color: Colors.grey),
+                      const SizedBox(width: 4),
+                      Text(
+                        _calcularEdadBonita(gallo.fechaNacimiento),
+                        style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
                   
                   const SizedBox(height: 6),
                   
-                  // 🔥 PLACA Y PESO EN LA MISMA LÍNEA 🔥
+                  // 🔥 PLACA Y PESO (BLINDADO CONTRA DESBORDAMIENTO) 🔥
                   Row(
                     children: [
-                      Text(
-                        'Placa: ${gallo.placa}',
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFFD4AF37),
+                      // Usamos Flexible para que la placa ocupe lo necesario pero deje espacio
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: const Color(0xFFD4AF37)),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'Placa: ${gallo.placa}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFFD4AF37),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 15),
-                      // INDICADOR DE PESO EN LIBRAS
+                      
+                      const SizedBox(width: 10),
+                      
+                      // PESO
                       if (gallo.pesoActual != null) ...[
                         const Icon(FontAwesomeIcons.weightScale, size: 10, color: Colors.grey),
                         const SizedBox(width: 4),
@@ -173,26 +224,26 @@ class TarjetaGallo extends StatelessWidget {
                     ],
                   ),
                   
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
 
-                  // Botones de acción
+                  // Botones de acción alineados a la derecha
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                        InkWell(
                          onTap: onEdit,
                          child: Container(
-                           padding: const EdgeInsets.all(8),
-                           decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(8)),
+                           padding: const EdgeInsets.all(6),
+                           decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(6)),
                            child: Icon(FontAwesomeIcons.pencil, size: 14, color: Colors.blue.shade800),
                          ),
                        ),
-                       const SizedBox(width: 10),
+                       const SizedBox(width: 12),
                        InkWell(
                          onTap: onDelete,
                          child: Container(
-                           padding: const EdgeInsets.all(8),
-                           decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
+                           padding: const EdgeInsets.all(6),
+                           decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(6)),
                            child: Icon(FontAwesomeIcons.trash, size: 14, color: Colors.red.shade800),
                          ),
                        ),

@@ -48,9 +48,28 @@ class PantallaDetalleGallo extends StatelessWidget {
     );
   }
 
-  int _calcularEdadMeses(DateTime fechaNacimiento) {
-    final dias = DateTime.now().difference(fechaNacimiento).inDays;
-    return (dias / 30).floor();
+  // 🔥 NUEVA LÓGICA DE EDAD (AÑOS Y MESES)
+  String _calcularEdadBonita(DateTime nacimiento) {
+    final ahora = DateTime.now();
+    int anos = ahora.year - nacimiento.year;
+    int meses = ahora.month - nacimiento.month;
+    int dias = ahora.day - nacimiento.day;
+
+    // Ajuste si no ha cumplido años este año
+    if (meses < 0 || (meses == 0 && dias < 0)) {
+      anos--;
+      meses += 12;
+    }
+    
+    // Ajuste de días para meses
+    if (dias < 0) {
+      meses--;
+      if (meses < 0) meses += 12;
+    }
+
+    if (anos == 0) return '$meses Meses';
+    if (meses == 0) return '$anos Años'; // Caso raro recién nacido
+    return '$anos Años, $meses m';
   }
 
   Color _colorEstado(String estado) {
@@ -70,7 +89,11 @@ class PantallaDetalleGallo extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        title: Text(gallo.nombre, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white)),
+        // Usamos FittedBox por si el nombre es muy largo en el AppBar
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(gallo.nombre, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white))
+        ),
         backgroundColor: const Color(0xFF1E3A8A),
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
@@ -163,14 +186,24 @@ class PantallaDetalleGallo extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
+          
           Text(
             gallo.placa, 
             style: GoogleFonts.poppins(color: Colors.white70, fontSize: 18, letterSpacing: 1.5)
           ),
-          Text(
-            gallo.nombre, 
-            style: GoogleFonts.poppins(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)
+          
+          // 🔥 RESPONSIVE: Si el nombre es muy largo, se ajusta
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              gallo.nombre, 
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+              maxLines: 2, // Permite 2 líneas
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
+          
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -191,9 +224,9 @@ class PantallaDetalleGallo extends StatelessWidget {
   Widget _buildResumenRapido() {
     return Row(
       children: [
-        _datoCard(FontAwesomeIcons.calendar, '${_calcularEdadMeses(gallo.fechaNacimiento)} Meses', 'Edad'),
+        // 🔥 AQUI SE USA LA NUEVA EDAD
+        _datoCard(FontAwesomeIcons.cakeCandles, _calcularEdadBonita(gallo.fechaNacimiento), 'Edad'),
         const SizedBox(width: 10),
-        // 🔥 CAMBIO AQUÍ: Kg -> Lbs
         _datoCard(FontAwesomeIcons.weightScale, '${gallo.pesoActual ?? "--"} Lbs', 'Peso'),
         const SizedBox(width: 10),
         _datoCard(gallo.sexo == 'Macho' ? FontAwesomeIcons.mars : FontAwesomeIcons.venus, gallo.sexo, 'Sexo'),
@@ -255,7 +288,6 @@ class PantallaDetalleGallo extends StatelessWidget {
             const SizedBox(height: 15),
             _infoFila('Etapa Vida', gallo.etapaVida),
             _infoFila('Tipo Cresta', gallo.tipoCresta),
-            // 🔥 CAMBIO AQUÍ: Kg -> Lbs
             _infoFila('Peso Combate', '${gallo.pesoCombate ?? "--"} Lbs'),
             const Divider(),
             const Text('Vacunas:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
@@ -272,11 +304,6 @@ class PantallaDetalleGallo extends StatelessWidget {
   }
 
   Widget _buildSeccionFinanzasYExtra(BuildContext context) {
-    // FORMATO DE MONEDA PARA VISUALIZACIÓN
-    // Usamos NumberFormat para mostrar el dinero bonito en la tarjeta
-    // Nota: Requiere 'package:intl/intl.dart' (que ya agregamos al proyecto)
-    // Pero si no quieres importar intl aquí, podemos usar toStringAsFixed(0) básico
-    
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -359,7 +386,14 @@ class PantallaDetalleGallo extends StatelessWidget {
           children: [
             Icon(icon, color: const Color(0xFF1E3A8A), size: 20),
             const SizedBox(height: 5),
-            Text(valor, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            // 🔥 FITTED BOX PARA QUE LA EDAD NO SE SALGA
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(valor, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))
+              ),
+            ),
             Text(label, style: const TextStyle(color: Colors.grey, fontSize: 10)),
           ],
         ),
@@ -377,6 +411,7 @@ class PantallaDetalleGallo extends StatelessWidget {
     );
   }
 
+  // 🔥 WIDGET MEJORADO PARA RESPONSIVE
   Widget _infoFila(String label, String valor) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
@@ -384,7 +419,17 @@ class PantallaDetalleGallo extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(color: Colors.grey)),
-          Text(valor, style: const TextStyle(fontWeight: FontWeight.w500)),
+          const SizedBox(width: 10), // Espacio mínimo
+          // Expanded obliga al texto a saltar de línea si es muy largo
+          Expanded(
+            child: Text(
+              valor, 
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+            ),
+          ),
         ],
       ),
     );
@@ -395,12 +440,19 @@ class PantallaDetalleGallo extends StatelessWidget {
       children: [
         CircleAvatar(radius: 12, backgroundColor: colorIcono.withOpacity(0.1), child: Icon(icono, size: 14, color: colorIcono)),
         const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(rol, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-            Text(nombre, style: const TextStyle(fontWeight: FontWeight.bold)),
-          ],
+        // Expanded para evitar overflow en nombres largos de padres
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(rol, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+              Text(
+                nombre, 
+                style: const TextStyle(fontWeight: FontWeight.bold),
+                overflow: TextOverflow.ellipsis, // Si es muy largo, puntos suspensivos
+              ),
+            ],
+          ),
         )
       ],
     );
@@ -409,12 +461,15 @@ class PantallaDetalleGallo extends StatelessWidget {
   Widget _textoAbuelo(String texto) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: Text(texto, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+      child: Text(
+        texto, 
+        style: const TextStyle(fontSize: 11, color: Colors.grey),
+        overflow: TextOverflow.ellipsis,
+      ),
     );
   }
 
   Widget _datoFinanciero(String label, double? monto, Color color) {
-    // Si tienes intl importado, podrías usar NumberFormat aquí también
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
