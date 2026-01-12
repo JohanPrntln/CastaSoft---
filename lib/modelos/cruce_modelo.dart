@@ -1,29 +1,24 @@
 class CruceModelo {
-  String id;
-  String userId;
+  final String id;
+  final String userId;
+  final String padreId;
+  final String nombrePadre;
+  final String madreId;
+  final String nombreMadre;
+  final DateTime fechaCruce;
+  final String faseLunar;
+  final int cantidadPollitos;
+  final int pollitosMuertos;
+  final int pollitosVivos;
   
-  // PADRES
-  String padreId;
-  String nombrePadre;
-  String madreId;
-  String nombreMadre;
-
-  // DETALLES DEL EVENTO
-  DateTime fechaCruce;
-  String faseLunar;
-  int cantidadPollitos; // Total que nacieron
-
-  // ESTADÍSTICAS DE VIDA (¡NUEVO!)
-  int pollitosVivos;
-  int pollitosMuertos;
-
-  // IDENTIFICACIÓN
-  String pataMarca;
-  String detalleMarca;
-
-  // MULTIMEDIA Y EXTRAS
-  String? fotoPath;
-  String? notas;
+  // 🔥 NUEVOS CAMPOS
+  final int pollitosMachos;
+  final int pollitosHembras;
+  
+  final String pataMarca;
+  final String detalleMarca;
+  final String? fotoPath;
+  final String? notas;
 
   CruceModelo({
     required this.id,
@@ -35,16 +30,23 @@ class CruceModelo {
     required this.fechaCruce,
     required this.faseLunar,
     required this.cantidadPollitos,
-    required this.pollitosVivos,   // Nuevo
-    required this.pollitosMuertos, // Nuevo
+    required this.pollitosMuertos,
+    required this.pollitosVivos,
+    
+    // 🔥 INICIALIZAR EN 0 SI NO SE ENVÍAN
+    this.pollitosMachos = 0, 
+    this.pollitosHembras = 0,
+    
     required this.pataMarca,
     required this.detalleMarca,
     this.fotoPath,
     this.notas,
   });
 
+  // Convertir a Map (Para SQLite/Firebase)
   Map<String, dynamic> toMap() {
     return {
+      'id': id,
       'userId': userId,
       'padreId': padreId,
       'nombrePadre': nombrePadre,
@@ -53,30 +55,35 @@ class CruceModelo {
       'fechaCruce': fechaCruce.toIso8601String(),
       'faseLunar': faseLunar,
       'cantidadPollitos': cantidadPollitos,
-      'pollitosVivos': pollitosVivos,     // Nuevo
-      'pollitosMuertos': pollitosMuertos, // Nuevo
+      'pollitosMuertos': pollitosMuertos,
+      'pollitosVivos': pollitosVivos,
+      'pollitosMachos': pollitosMachos, // 🔥 Guardar
+      'pollitosHembras': pollitosHembras, // 🔥 Guardar
       'pataMarca': pataMarca,
       'detalleMarca': detalleMarca,
-      'fotoPath': fotoPath ?? '',
-      'notas': notas ?? '',
+      'fotoPath': fotoPath,
+      'notas': notas,
     };
   }
 
-  factory CruceModelo.fromMap(Map<String, dynamic> map, String docId) {
+  // Crear desde Map
+  factory CruceModelo.fromMap(Map<String, dynamic> map) {
     return CruceModelo(
-      id: docId,
-      userId: map['userId'] ?? '',
-      padreId: map['padreId'] ?? '',
-      nombrePadre: map['nombrePadre'] ?? 'Desconocido',
-      madreId: map['madreId'] ?? '',
-      nombreMadre: map['nombreMadre'] ?? 'Desconocida',
+      id: map['id'],
+      userId: map['userId'],
+      padreId: map['padreId'],
+      nombrePadre: map['nombrePadre'],
+      madreId: map['madreId'],
+      nombreMadre: map['nombreMadre'],
       fechaCruce: DateTime.parse(map['fechaCruce']),
-      faseLunar: map['faseLunar'] ?? '',
-      cantidadPollitos: map['cantidadPollitos'] ?? 0,
-      pollitosVivos: map['pollitosVivos'] ?? map['cantidadPollitos'] ?? 0, // Por defecto todos vivos
-      pollitosMuertos: map['pollitosMuertos'] ?? 0,
-      pataMarca: map['pataMarca'] ?? 'Derecha',
-      detalleMarca: map['detalleMarca'] ?? '',
+      faseLunar: map['faseLunar'],
+      cantidadPollitos: map['cantidadPollitos'],
+      pollitosMuertos: map['pollitosMuertos'],
+      pollitosVivos: map['pollitosVivos'],
+      pollitosMachos: map['pollitosMachos'] ?? 0, // 🔥 Recuperar
+      pollitosHembras: map['pollitosHembras'] ?? 0, // 🔥 Recuperar
+      pataMarca: map['pataMarca'],
+      detalleMarca: map['detalleMarca'],
       fotoPath: map['fotoPath'],
       notas: map['notas'],
     );

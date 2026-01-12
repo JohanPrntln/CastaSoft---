@@ -14,7 +14,7 @@ import 'package:castasoft/proveedores/cruces_proveedor.dart';
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
 
 class PantallaFormularioCruce extends StatefulWidget {
-  final CruceModelo? cruceEditar; // Puede recibir un cruce para editar
+  final CruceModelo? cruceEditar; 
   const PantallaFormularioCruce({Key? key, this.cruceEditar}) : super(key: key);
 
   @override
@@ -27,7 +27,10 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
 
   // Controladores
   final _ctrlCantidad = TextEditingController();
-  final _ctrlMuertos = TextEditingController(text: '0'); // Nuevo campo para bajas
+  final _ctrlMuertos = TextEditingController(text: '0');
+  final _ctrlMachos = TextEditingController(text: '0'); 
+  final _ctrlHembras = TextEditingController(text: '0'); 
+
   final _ctrlMarca = TextEditingController();
   final _ctrlNotas = TextEditingController();
   final _ctrlFecha = TextEditingController();
@@ -36,10 +39,24 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
   String? _padreId;
   String? _madreId;
   String? _faseLunar;
-  String _pataMarca = 'Derecha';
+  
+  // 🔥 CAMBIO: Valor por defecto más común
+  String _pataMarca = 'Pata Derecha'; 
+  
+  // 🔥 NUEVA LISTA DE OPCIONES INCLUSIVA
+  final List<String> _opcionesIdentificacion = [
+    'Pata Derecha',
+    'Pata Izquierda',
+    'Ambas Patas',
+    'Ala Derecha',
+    'Ala Izquierda',
+    'Placa / Cuello',
+    'Sin Marca / Otro'
+  ];
+
   DateTime _fechaSeleccionada = DateTime.now();
   File? _imagenNueva;
-  String? _fotoActualBase64; // Para mostrar la foto vieja al editar
+  String? _fotoActualBase64; 
   bool _guardando = false;
   bool _esEdicion = false;
 
@@ -62,8 +79,20 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
     _ctrlFecha.text = DateFormat('dd/MM/yyyy').format(c.fechaCruce);
     _faseLunar = c.faseLunar;
     _ctrlCantidad.text = c.cantidadPollitos.toString();
-    _ctrlMuertos.text = c.pollitosMuertos.toString(); // Cargar muertos
-    _pataMarca = c.pataMarca;
+    _ctrlMuertos.text = c.pollitosMuertos.toString();
+    _ctrlMachos.text = c.pollitosMachos.toString();
+    _ctrlHembras.text = c.pollitosHembras.toString();
+    
+    // Si la marca guardada no está en la nueva lista, la agregamos temporalmente o la mandamos a 'Sin Marca'
+    if (_opcionesIdentificacion.contains(c.pataMarca)) {
+      _pataMarca = c.pataMarca;
+    } else {
+      // Manejo de compatibilidad con versiones viejas (que decían solo 'Izquierda' o 'Derecha')
+      if (c.pataMarca == 'Izquierda') _pataMarca = 'Pata Izquierda';
+      else if (c.pataMarca == 'Derecha') _pataMarca = 'Pata Derecha';
+      else _pataMarca = 'Sin Marca / Otro';
+    }
+
     _ctrlMarca.text = c.detalleMarca;
     _ctrlNotas.text = c.notas ?? '';
     _fotoActualBase64 = c.fotoPath;
@@ -75,6 +104,14 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
     if (picked != null) setState(() => _imagenNueva = File(picked.path));
   }
 
+  // 🔥 NUEVO: Función para borrar la foto
+  void _borrarFoto() {
+    setState(() {
+      _imagenNueva = null;
+      _fotoActualBase64 = null;
+    });
+  }
+
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
     if (_padreId == null || _madreId == null) {
@@ -82,11 +119,21 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
       return;
     }
 
-    // Validar lógica de números
     int total = int.tryParse(_ctrlCantidad.text) ?? 0;
     int muertos = int.tryParse(_ctrlMuertos.text) ?? 0;
+    int machos = int.tryParse(_ctrlMachos.text) ?? 0;
+    int hembras = int.tryParse(_ctrlHembras.text) ?? 0;
+
     if (muertos > total) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No pueden haber más muertos que nacidos')));
+      _mostrarError('No pueden haber más muertos ($muertos) que el total ($total)');
+      return;
+    }
+
+    int vivos = total - muertos;
+    int sumaSexados = machos + hembras;
+    
+    if (sumaSexados > vivos) {
+      _mostrarError('Error: Tienes $vivos vivos, pero $sumaSexados sexados ($machos M + $hembras H).');
       return;
     }
 
@@ -94,8 +141,6 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
 
     try {
       final gallosProv = context.read<GallosProveedor>();
-      
-      // Intentamos buscar los nombres actualizados, si no existen (fueron borrados), usamos los viejos si es edición
       String nombreP = 'Desconocido';
       String nombreM = 'Desconocida';
       
@@ -111,8 +156,8 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
 
       final user = FirebaseAuth.instance.currentUser;
 
-      // Manejo de la foto
       String? fotoFinal;
+      // Lógica: Si hay imagen nueva, úsala. Si no hay nueva pero hay vieja, usa vieja. Si ambas son null (porque se borró), manda null.
       if (_imagenNueva != null) {
         final bytes = await _imagenNueva!.readAsBytes();
         fotoFinal = 'base64,${base64Encode(bytes)}';
@@ -131,7 +176,9 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
         faseLunar: _faseLunar ?? 'Creciente',
         cantidadPollitos: total,
         pollitosMuertos: muertos,
-        pollitosVivos: total - muertos, // 🔥 CÁLCULO AUTOMÁTICO
+        pollitosVivos: vivos, 
+        pollitosMachos: machos,
+        pollitosHembras: hembras,
         pataMarca: _pataMarca,
         detalleMarca: _ctrlMarca.text.trim(),
         fotoPath: fotoFinal,
@@ -146,15 +193,22 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
       
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      _mostrarError('Error: $e');
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
   }
 
+  void _mostrarError(String mensaje) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(children: [const Icon(Icons.error_outline, color: Colors.white), const SizedBox(width: 10), Expanded(child: Text(mensaje))]),
+      backgroundColor: Colors.red.shade700,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Listas para los dropdowns
     final gallos = context.watch<GallosProveedor>().gallos;
     final padres = gallos.where((g) => g.sexo == 'Macho').toList();
     final madres = gallos.where((g) => g.sexo == 'Hembra').toList();
@@ -172,12 +226,10 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
               key: _formKey,
               child: Column(
                 children: [
-                  // 1. PADRES
                   _buildCard('🧬 Los Padres', [
                     DropdownButtonFormField<String>(
                       decoration: _inputDeco('Padre (Macho)', FontAwesomeIcons.mars),
                       value: _padreId,
-                      // Si editamos y el padre fue borrado, no aparecerá en la lista, hay que manejar eso visualmente
                       items: padres.map((g) => DropdownMenuItem(value: g.id, child: Text(g.nombre))).toList(),
                       onChanged: (v) => setState(() => _padreId = v),
                     ),
@@ -192,7 +244,6 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
 
                   const SizedBox(height: 20),
 
-                  // 2. ESTADÍSTICAS DE VIDA (MODIFICADO)
                   _buildCard('🐣 Estadísticas de la Camada', [
                     Row(children: [
                       Expanded(
@@ -223,7 +274,6 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                     ]),
                     const SizedBox(height: 15),
                     
-                    // 🔥 AQUÍ ESTÁ EL CAMBIO IMPORTANTE: TOTAL vs MUERTOS
                     Row(
                       children: [
                         Expanded(
@@ -232,6 +282,7 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                             keyboardType: TextInputType.number,
                             decoration: _inputDeco('Total Huevos', FontAwesomeIcons.egg),
                             validator: (v) => v!.isEmpty ? 'Requerido' : null,
+                            onChanged: (v) => setState((){}),
                           ),
                         ),
                         const SizedBox(width: 15),
@@ -242,39 +293,63 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                             style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
                             decoration: _inputDeco('Bajas/Muertos', FontAwesomeIcons.skull),
                             validator: (v) => v!.isEmpty ? 'Requerido' : null,
+                            onChanged: (v) => setState((){}),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 5),
-                    const Text('El sistema calculará automáticamente los vivos.', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    
+                    const SizedBox(height: 15),
+                    const Divider(),
+                    const SizedBox(height: 10),
+                    const Text('Sexado (La suma no puede superar los vivos)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12)),
+                    const SizedBox(height: 10),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _ctrlMachos,
+                            keyboardType: TextInputType.number,
+                            style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold),
+                            decoration: _inputDeco('Machos', FontAwesomeIcons.mars),
+                          ),
+                        ),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _ctrlHembras,
+                            keyboardType: TextInputType.number,
+                            style: TextStyle(color: Colors.pink.shade700, fontWeight: FontWeight.bold),
+                            decoration: _inputDeco('Hembras', FontAwesomeIcons.venus),
+                          ),
+                        ),
+                      ],
+                    ),
                   ]),
 
                   const SizedBox(height: 20),
 
-                  // 3. IDENTIFICACIÓN
-                  _buildCard('🏷️ Identificación', [
-                     DropdownButtonFormField<String>(
+                  _buildCard('🏷️ Identificación Inclusiva', [
+                      DropdownButtonFormField<String>(
                         value: _pataMarca,
-                        items: ['Izquierda', 'Derecha'].map((l) => DropdownMenuItem(value: l, child: Text('Pata $l'))).toList(),
+                        isExpanded: true, // Para que los textos largos no se corten
+                        items: _opcionesIdentificacion.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
                         onChanged: (v) => setState(() => _pataMarca = v!),
-                        // 🔥 RECOMENDACIÓN: Usamos 'locationDot' (Pin de ubicación)
-                        // Significa: "¿En qué lugar está la marca?"
-                        decoration: _inputDeco('Ubicación', FontAwesomeIcons.locationDot),
+                        decoration: _inputDeco('Zona de Marca', FontAwesomeIcons.locationDot),
                       ),
                       const SizedBox(height: 15),
                       TextFormField(
                         controller: _ctrlMarca,
                         maxLines: 2,
-                        decoration: _inputDeco('Detalle Marca (Ej: Argolla roja #2)', FontAwesomeIcons.tag),
+                        decoration: _inputDeco('Detalle (Ej: Argolla roja #2, Placa 55)', FontAwesomeIcons.tag),
                       ),
                   ]),
 
                   const SizedBox(height: 20),
 
-                  // 4. NOTAS
                   _buildCard('📝 Notas', [
-                     TextFormField(
+                      TextFormField(
                         controller: _ctrlNotas,
                         maxLines: 3,
                         decoration: _inputDeco('Observaciones adicionales', Icons.note),
@@ -283,11 +358,8 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
 
                   const SizedBox(height: 20),
 
-                  // 5. FOTO
-                  GestureDetector(
-                    onTap: _seleccionarFoto,
-                    child: _buildFotoPreview(),
-                  ),
+                  // 🔥 AQUÍ ESTÁ EL CAMBIO DE LA FOTO
+                  _buildFotoPreview(),
 
                   const SizedBox(height: 30),
 
@@ -307,32 +379,58 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
     );
   }
 
+  // 🔥 WIDGET DE FOTO CON BOTÓN DE BORRAR
   Widget _buildFotoPreview() {
     ImageProvider? imgProvider;
+    bool hayFoto = false;
+
     if (_imagenNueva != null) {
       imgProvider = FileImage(_imagenNueva!);
+      hayFoto = true;
     } else if (_fotoActualBase64 != null && _fotoActualBase64!.startsWith('base64')) {
       imgProvider = MemoryImage(base64Decode(_fotoActualBase64!.split(',').last));
+      hayFoto = true;
     }
 
-    return Container(
-      height: 150,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(12),
-        image: imgProvider != null ? DecorationImage(image: imgProvider, fit: BoxFit.cover) : null,
-      ),
-      child: imgProvider == null 
-        ? Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.camera_alt, size: 40, color: _colorTema),
-              Text('Foto de la camada', style: TextStyle(color: _colorTema))
-            ],
-          )
-        : null,
+    return Stack(
+      children: [
+        GestureDetector(
+          onTap: _seleccionarFoto,
+          child: Container(
+            height: 150,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(12),
+              image: imgProvider != null ? DecorationImage(image: imgProvider, fit: BoxFit.cover) : null,
+            ),
+            child: imgProvider == null 
+              ? Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.camera_alt, size: 40, color: _colorTema),
+                    Text('Tocar para agregar foto', style: TextStyle(color: _colorTema))
+                  ],
+                )
+              : null,
+          ),
+        ),
+        
+        // BOTÓN DE BORRAR (SOLO SI HAY FOTO)
+        if (hayFoto)
+          Positioned(
+            top: 5, right: 5,
+            child: GestureDetector(
+              onTap: _borrarFoto,
+              child: Container(
+                padding: const EdgeInsets.all(5),
+                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                child: const Icon(Icons.close, color: Colors.white, size: 18),
+              ),
+            ),
+          ),
+      ],
     );
   }
 

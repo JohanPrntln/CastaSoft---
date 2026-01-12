@@ -10,7 +10,7 @@ class CrucesProveedor with ChangeNotifier {
   List<CruceModelo> get cruces => _cruces;
   bool get cargando => _cargando;
 
-  // 1. CARGAR CRUCES
+  // 1. CARGAR CRUCES (CORREGIDO PARA LEER DATOS ANTIGUOS)
   Future<void> cargarCruces() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -25,9 +25,15 @@ class CrucesProveedor with ChangeNotifier {
           .orderBy('fechaCruce', descending: true)
           .get();
 
-      _cruces = snapshot.docs
-          .map((doc) => CruceModelo.fromMap(doc.data(), doc.id))
-          .toList();
+      _cruces = snapshot.docs.map((doc) {
+        // 🔥 TRUCO: Obtenemos los datos y le inyectamos el ID manualmente
+        // Esto arregla el problema de que los registros viejos no se veían.
+        final data = doc.data();
+        data['id'] = doc.id; 
+        
+        return CruceModelo.fromMap(data);
+      }).toList();
+      
     } catch (e) {
       print("Error cargando cruces: $e");
     } finally {
@@ -44,7 +50,7 @@ class CrucesProveedor with ChangeNotifier {
           .doc(cruce.id)
           .set(cruce.toMap());
       
-      _cruces.insert(0, cruce); // Agregarlo al inicio de la lista local
+      _cruces.insert(0, cruce); 
       notifyListeners();
     } catch (e) {
       print("Error creando cruce: $e");
@@ -63,7 +69,8 @@ class CrucesProveedor with ChangeNotifier {
       rethrow;
     }
   }
-  // 4. ACTUALIZAR CRUCE (¡NUEVO!)
+
+  // 4. ACTUALIZAR CRUCE
   Future<void> actualizarCruce(CruceModelo cruce) async {
     try {
       await FirebaseFirestore.instance
@@ -71,7 +78,6 @@ class CrucesProveedor with ChangeNotifier {
           .doc(cruce.id)
           .update(cruce.toMap());
 
-      // Actualizar la lista localmente para ver el cambio inmediato
       final index = _cruces.indexWhere((c) => c.id == cruce.id);
       if (index != -1) {
         _cruces[index] = cruce;

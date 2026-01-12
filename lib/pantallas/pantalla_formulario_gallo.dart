@@ -449,7 +449,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         _buildCard('Estado Actual', [
           _buildResponsiveDualInput(
             _buildDropdown('Estado', ['Activo', 'Vendido', 'Baja', 'Retirado'], _estado, (v) => setState(() => _estado = v)),
-            _buildDropdown('Etapa', ['Cría', 'Levante', 'Muda', 'Postura', 'Padrote'], _etapaVida, (v) => setState(() => _etapaVida = v))
+            _buildDropdown('Etapa', ['Cría', 'Levante', 'Muda', 'Postura', 'Padrote','Madrilla'], _etapaVida, (v) => setState(() => _etapaVida = v))
           ),
           const SizedBox(height: 15),
           _buildResponsiveDualInput(

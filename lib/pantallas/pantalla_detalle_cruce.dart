@@ -15,7 +15,7 @@ class PantallaDetalleCruce extends StatelessWidget {
 
   const PantallaDetalleCruce({Key? key, required this.cruce}) : super(key: key);
 
-  // 🔥 FUNCIÓN PARA EXPANDIR LA FOTO
+  // FUNCIÓN PARA EXPANDIR LA FOTO
   void _mostrarImagenGrande(BuildContext context, String base64String) {
     showDialog(
       context: context,
@@ -78,7 +78,7 @@ class PantallaDetalleCruce extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // 1. FOTO GRANDE (CON ZOOM AL CLIC)
+            // 1. FOTO GRANDE
             GestureDetector(
               onTap: () {
                  if (cruce.fotoPath != null && cruce.fotoPath!.startsWith('base64')) {
@@ -119,7 +119,7 @@ class PantallaDetalleCruce extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
 
-                  // 3. TARJETA DE ESTADÍSTICAS
+                  // 3. TARJETA DE ESTADÍSTICAS (Actualizada)
                   Card(
                     elevation: 4,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -136,9 +136,25 @@ class PantallaDetalleCruce extends StatelessWidget {
                           ),
                           const Divider(),
                           const SizedBox(height: 10),
+                          
+                          // VIVOS Y MUERTOS
                           _buildBarraProgreso('Vivos', cruce.pollitosVivos, cruce.cantidadPollitos, Colors.green),
                           const SizedBox(height: 15),
                           _buildBarraProgreso('Bajas (Muertos)', cruce.pollitosMuertos, cruce.cantidadPollitos, Colors.red),
+                          
+                          const SizedBox(height: 15),
+                          const Divider(height: 30),
+                          
+                          // SEXADO (MACHOS Y HEMBRAS)
+                          Text("Distribución de Sexo", style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(child: _buildDatoCircular('Machos', cruce.pollitosMachos, Colors.blue.shade600, FontAwesomeIcons.mars)),
+                              const SizedBox(width: 15),
+                              Expanded(child: _buildDatoCircular('Hembras', cruce.pollitosHembras, Colors.pink.shade400, FontAwesomeIcons.venus)),
+                            ],
+                          )
                         ],
                       ),
                     ),
@@ -169,6 +185,26 @@ class PantallaDetalleCruce extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // WIDGET CIRCULAR PARA SEXO
+  Widget _buildDatoCircular(String label, int valor, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 24),
+          const SizedBox(height: 5),
+          Text('$valor', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+          Text(label, style: TextStyle(fontSize: 12, color: color)),
+        ],
       ),
     );
   }

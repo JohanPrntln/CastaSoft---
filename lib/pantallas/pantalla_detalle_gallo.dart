@@ -5,8 +5,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'dart:io';
+
+// Modelos y Proveedores
 import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
+
+// 🔥 IMPORTANTE: Importamos la pantalla de exportar para que el botón funcione
+import 'package:castasoft/pantallas/pantalla_exportar_pedigree.dart';
 
 class PantallaDetalleGallo extends StatelessWidget {
   final Gallo gallo;
@@ -48,27 +53,25 @@ class PantallaDetalleGallo extends StatelessWidget {
     );
   }
 
-  // 🔥 NUEVA LÓGICA DE EDAD (AÑOS Y MESES)
+  // 🔥 LÓGICA DE EDAD (AÑOS Y MESES)
   String _calcularEdadBonita(DateTime nacimiento) {
     final ahora = DateTime.now();
     int anos = ahora.year - nacimiento.year;
     int meses = ahora.month - nacimiento.month;
     int dias = ahora.day - nacimiento.day;
 
-    // Ajuste si no ha cumplido años este año
     if (meses < 0 || (meses == 0 && dias < 0)) {
       anos--;
       meses += 12;
     }
     
-    // Ajuste de días para meses
     if (dias < 0) {
       meses--;
       if (meses < 0) meses += 12;
     }
 
     if (anos == 0) return '$meses Meses';
-    if (meses == 0) return '$anos Años'; // Caso raro recién nacido
+    if (meses == 0) return '$anos Años';
     return '$anos Años, $meses m';
   }
 
@@ -89,7 +92,6 @@ class PantallaDetalleGallo extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
-        // Usamos FittedBox por si el nombre es muy largo en el AppBar
         title: FittedBox(
           fit: BoxFit.scaleDown,
           child: Text(gallo.nombre, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white))
@@ -98,6 +100,21 @@ class PantallaDetalleGallo extends StatelessWidget {
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         actions: [
+          // 🔥 BOTÓN NUEVO: GENERAR PEDIGRÍ
+          IconButton(
+            icon: const Icon(FontAwesomeIcons.certificate, color: Color(0xFFD4AF37)), // Icono dorado
+            tooltip: 'Generar Pedigrí',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PantallaExportarPedigree(gallo: gallo),
+                ),
+              );
+            },
+          ),
+
+          // MENÚ DE OPCIONES
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
             onSelected: (value) => Navigator.pop(context, value),
@@ -192,14 +209,13 @@ class PantallaDetalleGallo extends StatelessWidget {
             style: GoogleFonts.poppins(color: Colors.white70, fontSize: 18, letterSpacing: 1.5)
           ),
           
-          // 🔥 RESPONSIVE: Si el nombre es muy largo, se ajusta
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
               gallo.nombre, 
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
-              maxLines: 2, // Permite 2 líneas
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -224,7 +240,6 @@ class PantallaDetalleGallo extends StatelessWidget {
   Widget _buildResumenRapido() {
     return Row(
       children: [
-        // 🔥 AQUI SE USA LA NUEVA EDAD
         _datoCard(FontAwesomeIcons.cakeCandles, _calcularEdadBonita(gallo.fechaNacimiento), 'Edad'),
         const SizedBox(width: 10),
         _datoCard(FontAwesomeIcons.weightScale, '${gallo.pesoActual ?? "--"} Lbs', 'Peso'),
@@ -386,7 +401,6 @@ class PantallaDetalleGallo extends StatelessWidget {
           children: [
             Icon(icon, color: const Color(0xFF1E3A8A), size: 20),
             const SizedBox(height: 5),
-            // 🔥 FITTED BOX PARA QUE LA EDAD NO SE SALGA
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: FittedBox(
@@ -411,7 +425,6 @@ class PantallaDetalleGallo extends StatelessWidget {
     );
   }
 
-  // 🔥 WIDGET MEJORADO PARA RESPONSIVE
   Widget _infoFila(String label, String valor) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
@@ -419,8 +432,7 @@ class PantallaDetalleGallo extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(color: Colors.grey)),
-          const SizedBox(width: 10), // Espacio mínimo
-          // Expanded obliga al texto a saltar de línea si es muy largo
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               valor, 
@@ -440,7 +452,6 @@ class PantallaDetalleGallo extends StatelessWidget {
       children: [
         CircleAvatar(radius: 12, backgroundColor: colorIcono.withOpacity(0.1), child: Icon(icono, size: 14, color: colorIcono)),
         const SizedBox(width: 10),
-        // Expanded para evitar overflow en nombres largos de padres
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -449,7 +460,7 @@ class PantallaDetalleGallo extends StatelessWidget {
               Text(
                 nombre, 
                 style: const TextStyle(fontWeight: FontWeight.bold),
-                overflow: TextOverflow.ellipsis, // Si es muy largo, puntos suspensivos
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),

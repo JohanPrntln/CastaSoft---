@@ -9,6 +9,8 @@ class TarjetaGallo extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  // 🔥 NUEVO CALLBACK PARA EL PEDIGREE
+  final VoidCallback? onPedigree; 
 
   const TarjetaGallo({
     Key? key,
@@ -16,9 +18,10 @@ class TarjetaGallo extends StatelessWidget {
     this.onTap,
     this.onEdit,
     this.onDelete,
+    this.onPedigree, // Recibimos la función aquí
   }) : super(key: key);
 
-  // --- 🔥 LÓGICA DE EDAD (AÑOS Y MESES) ---
+  // --- LÓGICA DE EDAD ---
   String _calcularEdadBonita(DateTime nacimiento) {
     final ahora = DateTime.now();
     int anos = ahora.year - nacimiento.year;
@@ -29,13 +32,10 @@ class TarjetaGallo extends StatelessWidget {
       anos--;
       meses += 12;
     }
-    
-    // Ajuste fino de días
     if (dias < 0) {
       meses--;
       if (meses < 0) meses += 12;
     }
-
     if (anos == 0) return '$meses meses';
     if (meses == 0) return '$anos años';
     return '$anos años, $meses m';
@@ -99,159 +99,181 @@ class TarjetaGallo extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
           children: [
-            
-            // === FOTO CUADRADA GRANDE ===
-            GestureDetector(
-              onTap: proveedorImagen != null 
-                  ? () => _mostrarImagenGrande(context, proveedorImagen!) 
-                  : null,
-              child: Container(
-                width: 90, // Un poco más pequeña para dar espacio en celulares chicos
-                height: 90,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: proveedorImagen != null 
-                      ? widgetImagen
-                      : Center(child: widgetImagen),
-                ),
-              ),
-            ),
-
-            const SizedBox(width: 12),
-
-            // === DETALLES (RESPONSIVE) ===
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Título y Estado
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          gallo.nombre,
-                          style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF0F172A),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis, // 🔥 Corta si es muy largo
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _colorFondoEstado(gallo.estado),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          gallo.estado,
-                          style: GoogleFonts.poppins(
-                            fontSize: 10, 
-                            fontWeight: FontWeight.bold,
-                            color: _colorTextoEstado(gallo.estado),
-                          ),
-                        ),
-                      ),
-                    ],
+            // PARTE SUPERIOR (FOTO + DATOS)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // FOTO
+                GestureDetector(
+                  onTap: proveedorImagen != null 
+                      ? () => _mostrarImagenGrande(context, proveedorImagen!) 
+                      : null,
+                  child: Container(
+                    width: 90, 
+                    height: 90,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: proveedorImagen != null 
+                          ? widgetImagen
+                          : Center(child: widgetImagen),
+                    ),
                   ),
+                ),
 
-                  // 🔥 NUEVO: EDAD CALCULADA
-                  const SizedBox(height: 4),
-                  Row(
+                const SizedBox(width: 12),
+
+                // DETALLES
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(FontAwesomeIcons.cakeCandles, size: 10, color: Colors.grey),
-                      const SizedBox(width: 4),
-                      Text(
-                        _calcularEdadBonita(gallo.fechaNacimiento),
-                        style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade600),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 6),
-                  
-                  // 🔥 PLACA Y PESO (BLINDADO CONTRA DESBORDAMIENTO) 🔥
-                  Row(
-                    children: [
-                      // Usamos Flexible para que la placa ocupe lo necesario pero deje espacio
-                      Flexible(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFFD4AF37)),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'Placa: ${gallo.placa}',
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFFD4AF37),
+                      // Título y Estado
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              gallo.nombre,
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF0F172A),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _colorFondoEstado(gallo.estado),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              gallo.estado,
+                              style: GoogleFonts.poppins(
+                                fontSize: 10, 
+                                fontWeight: FontWeight.bold,
+                                color: _colorTextoEstado(gallo.estado),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // EDAD
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(FontAwesomeIcons.cakeCandles, size: 10, color: Colors.grey),
+                          const SizedBox(width: 4),
+                          Text(
+                            _calcularEdadBonita(gallo.fechaNacimiento),
+                            style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey.shade600),
+                          ),
+                        ],
                       ),
                       
-                      const SizedBox(width: 10),
+                      const SizedBox(height: 6),
                       
-                      // PESO
-                      if (gallo.pesoActual != null) ...[
-                        const Icon(FontAwesomeIcons.weightScale, size: 10, color: Colors.grey),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${gallo.pesoActual} Lbs',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.grey.shade700,
+                      // PLACA Y PESO
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: const Color(0xFFD4AF37)),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'Placa: ${gallo.placa}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFFD4AF37),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ),
-                        ),
-                      ]
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 8),
+                          
+                          const SizedBox(width: 10),
+                          
+                          if (gallo.pesoActual != null) ...[
+                            const Icon(FontAwesomeIcons.weightScale, size: 10, color: Colors.grey),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${gallo.pesoActual} Lbs',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ]
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 8),
 
-                  // Botones de acción alineados a la derecha
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                       InkWell(
-                         onTap: onEdit,
-                         child: Container(
-                           padding: const EdgeInsets.all(6),
-                           decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(6)),
-                           child: Icon(FontAwesomeIcons.pencil, size: 14, color: Colors.blue.shade800),
-                         ),
-                       ),
-                       const SizedBox(width: 12),
-                       InkWell(
-                         onTap: onDelete,
-                         child: Container(
-                           padding: const EdgeInsets.all(6),
-                           decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(6)),
-                           child: Icon(FontAwesomeIcons.trash, size: 14, color: Colors.red.shade800),
-                         ),
-                       ),
+                      // Botones de acción (Editar / Borrar) alineados a la derecha
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                            InkWell(
+                              onTap: onEdit,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(6)),
+                                child: Icon(FontAwesomeIcons.pencil, size: 14, color: Colors.blue.shade800),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            InkWell(
+                              onTap: onDelete,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(6)),
+                                child: Icon(FontAwesomeIcons.trash, size: 14, color: Colors.red.shade800),
+                              ),
+                            ),
+                        ],
+                      ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+
+            const SizedBox(height: 10),
+            // 🔥 NUEVO BOTÓN GRANDE PARA GENERAR PEDIGREE
+            // Está fuera del Row principal para ocupar el ancho completo
+            if (onPedigree != null) 
+              SizedBox(
+                width: double.infinity,
+                height: 40,
+                child: ElevatedButton.icon(
+                  onPressed: onPedigree,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD4AF37), // Dorado
+                    foregroundColor: Colors.white,
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.workspace_premium, size: 20),
+                  label: Text("CERTIFICADO PEDIGREE", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 13)),
+                ),
+              ),
           ],
         ),
       ),
