@@ -9,7 +9,6 @@ class TarjetaGallo extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
-  // 🔥 NUEVO CALLBACK PARA EL PEDIGREE
   final VoidCallback? onPedigree; 
 
   const TarjetaGallo({
@@ -18,7 +17,7 @@ class TarjetaGallo extends StatelessWidget {
     this.onTap,
     this.onEdit,
     this.onDelete,
-    this.onPedigree, // Recibimos la función aquí
+    this.onPedigree,
   }) : super(key: key);
 
   // --- LÓGICA DE EDAD ---
@@ -256,8 +255,8 @@ class TarjetaGallo extends StatelessWidget {
             ),
 
             const SizedBox(height: 10),
-            // 🔥 NUEVO BOTÓN GRANDE PARA GENERAR PEDIGREE
-            // Está fuera del Row principal para ocupar el ancho completo
+
+            // BOTÓN GRANDE PARA GENERAR PEDIGREE (Este lo mantenemos porque es útil)
             if (onPedigree != null) 
               SizedBox(
                 width: double.infinity,

@@ -20,7 +20,7 @@ class _PantallaListaCrucesState extends State<PantallaListaCruces> {
   final TextEditingController _buscarCtrl = TextEditingController();
   String _filtroTexto = '';
   
-  // 🔥 CAMBIO: Variable explicita para controlar el chip activo
+  // Variable para controlar el chip activo
   bool _ordenMasReciente = true; // True = Recientes, False = Antiguos
 
   @override
@@ -93,7 +93,7 @@ class _PantallaListaCrucesState extends State<PantallaListaCruces> {
              c.detalleMarca.toLowerCase().contains(texto);
     }).toList();
 
-    // 2. ORDENAMIENTO (Basado en el Chip seleccionado)
+    // 2. ORDENAMIENTO
     listaFinal.sort((a, b) {
       if (_ordenMasReciente) {
         return b.fechaCruce.compareTo(a.fechaCruce); // Más recientes arriba
@@ -107,7 +107,6 @@ class _PantallaListaCrucesState extends State<PantallaListaCruces> {
       appBar: AppBar(
         title: const Text('Historial de Genética'),
         backgroundColor: _colorTema,
-        // 🔥 QUITAMOS EL ICONO CONFUSO DE AQUÍ
       ),
       body: Column(
         children: [
@@ -144,7 +143,7 @@ class _PantallaListaCrucesState extends State<PantallaListaCruces> {
 
           const SizedBox(height: 10),
 
-          // 🔥 NUEVO DISEÑO DE FILTROS (CHIPS VISUALES)
+          // FILTROS (CHIPS)
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -226,22 +225,32 @@ class _PantallaListaCrucesState extends State<PantallaListaCruces> {
                                   ],
                                 ),
                                 const Divider(height: 25),
-                                // BOTONES DE ACCIÓN (EDITAR / ELIMINAR)
+                                
+                                // 🔥 BOTONES DE ACCIÓN (SOLO ICONOS PEQUEÑOS)
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
-                                    TextButton.icon(
-                                      icon: const Icon(Icons.edit, size: 18, color: Colors.blue),
-                                      label: const Text('Editar', style: TextStyle(color: Colors.blue)),
-                                      onPressed: () {
-                                         Navigator.push(context, MaterialPageRoute(builder: (_) => PantallaFormularioCruce(cruceEditar: c)));
-                                      },
+                                    // Botón Editar
+                                    Tooltip(
+                                      message: 'Editar Cruce',
+                                      child: IconButton(
+                                        icon: const Icon(Icons.edit, size: 22, color: Colors.blue),
+                                        // visualDensity compact reduce el espacio extra alrededor del icono
+                                        visualDensity: VisualDensity.compact, 
+                                        onPressed: () {
+                                           Navigator.push(context, MaterialPageRoute(builder: (_) => PantallaFormularioCruce(cruceEditar: c)));
+                                        },
+                                      ),
                                     ),
-                                    const SizedBox(width: 10),
-                                    TextButton.icon(
-                                      icon: const Icon(Icons.delete, size: 18, color: Colors.red),
-                                      label: const Text('Eliminar', style: TextStyle(color: Colors.red)),
-                                      onPressed: () => _confirmarEliminar(context, c.id, '${c.nombrePadre} x ${c.nombreMadre}'),
+                                    const SizedBox(width: 5), // Separación pequeña
+                                    // Botón Eliminar
+                                    Tooltip(
+                                      message: 'Eliminar Cruce',
+                                      child: IconButton(
+                                        icon: const Icon(Icons.delete, size: 22, color: Colors.red),
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: () => _confirmarEliminar(context, c.id, '${c.nombrePadre} x ${c.nombreMadre}'),
+                                      ),
                                     ),
                                   ],
                                 )
@@ -263,7 +272,6 @@ class _PantallaListaCrucesState extends State<PantallaListaCruces> {
     );
   }
 
-  // 🔥 WIDGET NUEVO: CHIP DE FILTRO SELECCIONABLE
   Widget _buildFilterChip(String label, bool esModoReciente) {
     bool estaSeleccionado = (_ordenMasReciente == esModoReciente);
     

@@ -100,7 +100,7 @@ class PantallaDetalleGallo extends StatelessWidget {
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         actions: [
-          // 🔥 BOTÓN NUEVO: GENERAR PEDIGRÍ
+          // 🔥 BOTÓN: GENERAR PEDIGRÍ
           IconButton(
             icon: const Icon(FontAwesomeIcons.certificate, color: Color(0xFFD4AF37)), // Icono dorado
             tooltip: 'Generar Pedigrí',
@@ -318,6 +318,7 @@ class PantallaDetalleGallo extends StatelessWidget {
     );
   }
 
+  // 🔥 AQUÍ ESTÁ EL CAMBIO IMPORTANTE: BOTÓN AZUL GENÉRICO
   Widget _buildSeccionFinanzasYExtra(BuildContext context) {
     return Card(
       elevation: 4,
@@ -341,36 +342,41 @@ class PantallaDetalleGallo extends StatelessWidget {
               ],
             ),
             
+            // LÓGICA DEL BOTÓN DE ENLACE / VIDEO
             if (gallo.videoUrl != null && gallo.videoUrl!.isNotEmpty) ...[
               const SizedBox(height: 15),
               SizedBox(
                 width: double.infinity,
+                height: 50, // Más alto para que sea fácil de tocar
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     String urlString = gallo.videoUrl!;
+                    // Aseguramos que tenga https si no lo tiene
                     if (!urlString.startsWith('http')) {
                       urlString = 'https://$urlString'; 
                     }
                     final Uri url = Uri.parse(urlString);
                     try {
+                      // mode: LaunchMode.externalApplication abre Youtube, Telegram, Chrome, etc.
                       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
                         throw 'No se pudo lanzar';
                       }
                     } catch (e) {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('No se pudo abrir el video: $urlString')),
+                          SnackBar(content: Text('No se pudo abrir el enlace: $urlString')),
                         );
                       }
                     }
                   },
-                  icon: const Icon(FontAwesomeIcons.youtube, color: Colors.white),
-                  label: const Text('Ver Video del Gallo', style: TextStyle(fontWeight: FontWeight.bold)),
+                  // 🔥 CAMBIO DE ESTILO: AZUL CORPORATIVO Y ICONO MUNDIAL
+                  icon: const Icon(Icons.language, color: Colors.white, size: 22), 
+                  label: const Text('VISITAR ENLACE / VIDEO', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF0000),
+                    backgroundColor: const Color(0xFF1E3A8A), // Azul CastaSoft
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),

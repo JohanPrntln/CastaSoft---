@@ -1,67 +1,52 @@
 name: castasoft
-description: "A new Flutter project."
+description: "Sistema de gestión para criaderos de gallos."
 publish_to: 'none'
 
 version: 1.0.1+2
 
 environment:
-  sdk: ^3.9.2
+  sdk: '>=3.0.0 <4.0.0' # 🔥 Más compatible
 
 dependencies:
   flutter:
     sdk: flutter
 
-  # Iconos estilo iOS
   cupertino_icons: ^1.0.8
-  
-  # Diseño corporativo
   google_fonts: ^6.1.0
   font_awesome_flutter: ^10.8.0
-  
-  # Localización
   flutter_localizations:
     sdk: flutter
   
-  # Base de datos SQLite
   sqflite: ^2.3.0
   sqflite_common_ffi: ^2.3.0
   
-  # Gestión de estado
   provider: ^6.1.0
-  
-  # Utilidades
   uuid: ^4.0.0
   intl: ^0.20.2
   
-  # Multimedia
   image_picker: ^1.1.2
-  
-  # Archivos y rutas
   path: ^1.8.2
-  path_provider: ^2.1.2  # <--- SOLO UNA VEZ AQUÍ
+  path_provider: ^2.1.2
   
-  # Firebase
   firebase_core: ^4.3.0
   firebase_auth: ^6.1.3
   cloud_firestore: ^6.1.1
   
-  # Utilidades App
   url_launcher: ^6.3.2
   screenshot: ^3.0.0
   share_plus: ^10.0.0
   qr_flutter: ^4.1.0
-  gal: ^2.3.2           # <--- LIBRERÍA DE GALERÍA LISTA
+  gal: ^2.3.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_launcher_icons: ^0.13.1
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
 
-  # Configuración de assets
   assets:
     - assets/images/
     - assets/logo_texto_castasoft_sf.png
@@ -69,9 +54,13 @@ flutter:
     - assets/logo_login_final.jpg
     - assets/icono_app.jpg 
     - assets/plantilla_pedigree.png
+    - assets/gallo_transparente.png
 
+# Configuración del icono
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/icono_app.jpg" 
   min_sdk_android: 21
+  image_path: "assets/gallo_transparente.png"
+  adaptive_icon_background: "#000000" 
+  adaptive_icon_foreground: "assets/gallo_transparente.png"

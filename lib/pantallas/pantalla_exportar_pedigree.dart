@@ -93,8 +93,10 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
     // 4. Contacto
     String telUsuario = usuario?.telefono ?? '';
     _whatsappCtrl = TextEditingController(text: telUsuario);
-    _linkExtraCtrl = TextEditingController(text: 'https://castasoft.app'); 
-    _labelQrDerechoCtrl = TextEditingController(text: 'Visítanos'); 
+    
+    // INICIAN VACÍOS PARA QUE SEA OPCIONAL
+    _linkExtraCtrl = TextEditingController(text: ''); 
+    _labelQrDerechoCtrl = TextEditingController(text: ''); 
     
     String nombreUsuario = usuario?.nombrePropietario ?? '';
     _firmaCtrl = TextEditingController(text: nombreUsuario);
@@ -173,34 +175,23 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
   @override
   Widget build(BuildContext context) {
     // ============================================================
-    // 🎛️ ZONA DE CALIBRACIÓN - AJUSTA ESTOS NÚMEROS
+    // 🎛️ ZONA DE CALIBRACIÓN
     // ============================================================
-    // Si en tu PC se ve mal, mueve estos números hasta que cuadren con las líneas.
-    // Una vez cuadren en PC, cuadrarán en celular.
-    
-    // 1. Datos al lado de la foto (Nombre, Placa, etc)
-    // Left: Qué tan a la derecha están de la foto
     const double leftDatos = 190.0; 
-    
-    // Top: Altura de cada renglón. Ajusta esto según tus líneas doradas.
     const double topNombre = 185.2;  // 1er Renglón
     const double topPlaca  = 217.0;  // 2do Renglón
     const double topLinea  = 240.0;  // 3er Renglón
     const double topPeso   = 259.0;  // 4to Renglón
-    const double topColor  = 279.0;  // 5to Renglón (Nuevo)
+    const double topColor  = 279.0;  // 5to Renglón
 
-    // 2. Genealogía (Padres y Abuelos)
     const double topPadres = 363.0;
-    const double topAbuelos1 = 417.0; // Renglón de arriba de abuelos
-    const double topAbuelos2 = 435.0; // Renglón de abajo de abuelos
-    const double anchoAbuelos = 140.0;
+    const double topAbuelos1 = 417.0; 
+    const double topAbuelos2 = 435.0; 
 
-    // 3. Colores
     const Color textoCafeArmonico = Color(0xFF4E342E); 
     const Color textoCafeTitulo = Color(0xFF5D4037); 
     const Color doradoSuave = Color(0xFFD4AF37); 
 
-    // Medidas del Lienzo (NO TOCAR)
     const double anchoLienzo = 415; 
     const double altoLienzo = 590; 
 
@@ -265,10 +256,8 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
                         // 4. FOTO GALLO
                         Positioned(top: 195, left: 63, child: _construirFotoGallo(119, 144)),
 
-                        // 5. DATOS PRINCIPALES (Usando las variables de calibración)
-                        // Nombre (Sin etiqueta, ocupa más espacio, letra más grande)
+                        // 5. DATOS PRINCIPALES
                         _datoEnLienzo('', _nombreCtrl.text, topNombre, leftDatos, maxWidth: 200, size: 11, isTitle: true, colorBase: textoCafeArmonico),
-                        
                         _datoEnLienzo('Placa:', _placaCtrl.text, topPlaca, leftDatos, maxWidth: 200, colorBase: textoCafeArmonico),
                         _datoEnLienzo('Línea:', _razaCtrl.text, topLinea, leftDatos, maxWidth: 160, colorBase: textoCafeArmonico),
                         _datoEnLienzo('Peso:', _pesoCtrl.text, topPeso, leftDatos, maxWidth: 160, colorBase: textoCafeArmonico),
@@ -278,18 +267,40 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
                         _textoGenealogia(_padreCtrl.text, top: topPadres, left: 80, width: 120, color: const Color(0xFF1565C0)), // Azul
                         _textoGenealogia(_madreCtrl.text, top: topPadres, left: 210, width: 120, color: const Color(0xFFAD1457)), // Rosa
 
-                        // 7. GENEALOGÍA ABUELOS (Café)
+                        // 7. GENEALOGÍA ABUELOS
                         _textoGenealogia('Ab.P: ${_abueloPCtrl.text}', top: topAbuelos1, left: 70, width: 117, size: 9, color: textoCafeTitulo),
                         _textoGenealogia('Ab.M: ${_abuelaPCtrl.text}', top: topAbuelos2, left: 70, width: 117, size: 9, color: textoCafeTitulo),
                         _textoGenealogia('Ab.P: ${_abueloMCtrl.text}', top: topAbuelos1, left: 213, width: 117, size: 9, color: textoCafeTitulo),
                         _textoGenealogia('Ab.M: ${_abuelaMCtrl.text}', top: topAbuelos2, left: 213, width: 117, size: 9, color: textoCafeTitulo),
 
-                        // 8. CONTACTO Y QRs
-                        Positioned(bottom: 60, left: 68, child: _construirQR(_generarLinkWhatsApp())),
-                        Positioned(bottom: 48, left: 63, child: SizedBox(width: 60, child: Text("WhatsApp", textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 8, fontWeight: FontWeight.bold)))),
+                        // 8. CONTACTO Y QR IZQUIERDO (WhatsApp)
+                        Positioned(bottom: 62, left: 68, child: _construirQR(_generarLinkWhatsApp())),
+                        Positioned(bottom: 43, left: 63, child: SizedBox(width: 60, child: Text("WhatsApp", textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 8, fontWeight: FontWeight.bold)))),
 
-                        Positioned(bottom: 60, right: 67, child: _construirQR(_linkExtraCtrl.text.isEmpty ? 'https://castasoft.app' : _linkExtraCtrl.text)),
-                        Positioned(bottom: 48, right: 55, child: SizedBox(width: 75, child: Text(_labelQrDerechoCtrl.text, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, style: GoogleFonts.poppins(fontSize: 8, fontWeight: FontWeight.bold)))),
+                        // QR DERECHO OPCIONAL
+                        // Solo se muestra si el usuario escribió algo en el link
+                        if (_linkExtraCtrl.text.isNotEmpty)
+                          Positioned(
+                            bottom: 63, 
+                            right: 69, 
+                            child: _construirQR(_linkExtraCtrl.text)
+                          ),
+                        
+                        // Etiqueta del QR derecho
+                        if (_linkExtraCtrl.text.isNotEmpty)
+                          Positioned(
+                            bottom: 43, 
+                            right: 55, 
+                            child: SizedBox(
+                              width: 75, 
+                              child: Text(
+                                _labelQrDerechoCtrl.text.isEmpty ? 'Escanéame' : _labelQrDerechoCtrl.text, 
+                                textAlign: TextAlign.center, 
+                                overflow: TextOverflow.ellipsis, 
+                                style: GoogleFonts.poppins(fontSize: 8, fontWeight: FontWeight.bold)
+                              )
+                            )
+                          ),
 
                         // 9. FIRMA
                         Positioned(
@@ -297,9 +308,9 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
                           child: Center(child: Text(_firmaCtrl.text, style: GoogleFonts.dancingScript(fontSize: 18, fontWeight: FontWeight.w600, color: textoCafeArmonico), maxLines: 1, overflow: TextOverflow.ellipsis)),
                         ),
 
-                        // 10. MARCA DE AGUA (Corta y Abajo)
+                        // 10. MARCA DE AGUA
                         Positioned(
-                          bottom: 45, right: 0, left: 0, 
+                          bottom: 55, right: 0, left: 0, 
                           child: Center(child: Text('Tecnología CastaSoft ©', style: GoogleFonts.poppins(fontSize: 7, color: Colors.grey.shade400, letterSpacing: 1))),
                         ),
                       ],
@@ -328,7 +339,6 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
                   _input('Padre', _padreCtrl),
                   _input('Madre', _madreCtrl),
                   
-                  // 🔥 SOLUCIÓN: Usamos un Container con borde manual en vez de Card + ExpansionTile complejo
                   Container(
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.grey.shade400),
@@ -336,21 +346,20 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
                       color: Colors.white,
                     ),
                     child: ExpansionTile(
-                      shape: const Border(), // Quita el borde interno por defecto
+                      shape: const Border(),
                       title: const Text('Editar Abuelos', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                      // 🔥 AQUÍ ESTÁ EL ARREGLO: Damos padding ARRIBA (top: 20)
                       childrenPadding: const EdgeInsets.only(left: 15, right: 15, bottom: 15, top: 20),
                       expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                         Text("Rama Paterna (Macho)", style: TextStyle(fontSize: 12, color: Colors.blue.shade700, fontWeight: FontWeight.bold)),
-                         const SizedBox(height: 10),
-                         _input('Abuelo Paterno', _abueloPCtrl),
-                         _input('Abuela Paterna', _abuelaPCtrl),
-                         const Divider(),
-                         Text("Rama Materna (Hembra)", style: TextStyle(fontSize: 12, color: Colors.pink.shade700, fontWeight: FontWeight.bold)),
-                         const SizedBox(height: 10),
-                         _input('Abuelo Materno', _abueloMCtrl),
-                         _input('Abuela Materna', _abuelaMCtrl),
+                          Text("Rama Paterna (Macho)", style: TextStyle(fontSize: 12, color: Colors.blue.shade700, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 10),
+                          _input('Abuelo Paterno', _abueloPCtrl),
+                          _input('Abuela Paterna', _abuelaPCtrl),
+                          const Divider(),
+                          Text("Rama Materna (Hembra)", style: TextStyle(fontSize: 12, color: Colors.pink.shade700, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 10),
+                          _input('Abuelo Materno', _abueloMCtrl),
+                          _input('Abuela Materna', _abuelaMCtrl),
                       ],
                     ),
                   ),
@@ -377,9 +386,15 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
                   const SizedBox(height: 10),
                   _input('Firma', _firmaCtrl, icon: FontAwesomeIcons.signature),
                   
-                  _seccionTitulo('4. QR OPCIONAL'),
-                  _input('Enlace Extra', _linkExtraCtrl, icon: FontAwesomeIcons.link),
-                  _input('Texto QR', _labelQrDerechoCtrl, icon: Icons.label),
+                  // SECCIÓN OPCIONAL CLARA
+                  _seccionTitulo('4. QR DERECHO (OPCIONAL)'),
+                  const Text("Si dejas esto vacío, no saldrá el QR derecho.", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const SizedBox(height: 10),
+                  _input('Enlace Extra (Ej: Facebook/Instagram)', _linkExtraCtrl, icon: FontAwesomeIcons.link),
+                  // Solo mostrar input de etiqueta si hay link
+                  if (_linkExtraCtrl.text.isNotEmpty)
+                    _input('Texto debajo del QR (Ej: Síguenos)', _labelQrDerechoCtrl, icon: Icons.label),
+                  
                   const SizedBox(height: 50),
                 ],
               ),
@@ -397,8 +412,8 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
           _cargando ? 'GUARDANDO...' : 'GUARDAR IMAGEN', 
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-      ), // Aquí cierra el botón
-    ); // Aquí cierra el Scaffold
+      ), 
+    ); 
   } 
 
   Widget _seccionTitulo(String titulo) {
@@ -474,7 +489,24 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
     return Container(width: w, height: h, decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(4), image: imagen != null ? DecorationImage(image: imagen, fit: BoxFit.cover) : null, border: Border.all(color: const Color(0xFFD4AF37), width: 1.5)), child: imagen == null ? Icon(Icons.camera_alt, color: Colors.grey.shade400) : null);
   }
 
+  // 🔥 ARREGLO VISUAL DEL QR 🔥
   Widget _construirQR(String data) {
-    return Container(padding: const EdgeInsets.all(3), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)), child: QrImageView(data: data, version: QrVersions.auto, size: 50.0, backgroundColor: Colors.white, padding: EdgeInsets.zero, errorStateBuilder: (c, e) => const Icon(Icons.error, size: 20, color: Colors.red)));
+    return Container(
+      // Sin padding en el contenedor para ganar espacio
+      decoration: BoxDecoration(
+        color: Colors.white, 
+        borderRadius: BorderRadius.circular(2) 
+      ), 
+      child: QrImageView(
+        data: data, 
+        version: QrVersions.auto, 
+        // Aumentamos tamaño y reducimos padding interno para que llene el cuadro
+        size: 54.0, 
+        backgroundColor: Colors.white, 
+        padding: const EdgeInsets.all(2.0), 
+        gapless: true, 
+        errorStateBuilder: (c, e) => const Icon(Icons.error, size: 20, color: Colors.red),
+      ),
+    );
   }
 }

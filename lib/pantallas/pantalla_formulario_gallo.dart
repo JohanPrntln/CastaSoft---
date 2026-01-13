@@ -268,7 +268,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
           indicatorWeight: 4,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
-          isScrollable: true, // 🔥 Permite scroll si la pantalla es muy angosta
+          isScrollable: true,
           tabs: const [
             Tab(icon: Icon(FontAwesomeIcons.kiwiBird), text: 'Datos'),
             Tab(icon: Icon(FontAwesomeIcons.sitemap), text: 'Genealogía'),
@@ -332,12 +332,10 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     );
   }
 
-  // 🔥 WIDGET RESPONSIVO INTELIGENTE
-  // Si la pantalla es ancha, pone los inputs en Fila. Si es angosta, en Columna.
   Widget _buildResponsiveDualInput(Widget input1, Widget input2) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 350) { // Si hay menos de 350px de ancho
+        if (constraints.maxWidth < 350) { 
           return Column(
             children: [
               input1,
@@ -405,7 +403,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
       children: [
         _buildCard('Padres en el Sistema', [
           DropdownButtonFormField<String>(
-            isExpanded: true, // Evita desbordamiento en texto largo
+            isExpanded: true,
             value: _padreId,
             items: padres.map((g) => DropdownMenuItem(value: g.id, child: Text('${g.nombre} (${g.placa})', overflow: TextOverflow.ellipsis))).toList(),
             onChanged: (v) => setState(() => _padreId = v),
@@ -472,7 +470,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     );
   }
 
-  // PESTAÑA 4
+  // PESTAÑA 4 (🔥 AQUÍ ESTÁ EL CAMBIO DEL LABEL)
   Widget _buildTabFinanzas() {
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -487,7 +485,8 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         ]),
         const SizedBox(height: 20),
         _buildCard('Multimedia y Notas', [
-          _buildInput(_ctrlVideo, 'Link de Video', icon: Icons.video_library),
+          // 🔥 CAMBIO: Etiqueta general para cualquier enlace
+          _buildInput(_ctrlVideo, 'Enlace (YouTube, Drive, Telegram)', icon: FontAwesomeIcons.link),
           const SizedBox(height: 15),
           _buildInput(_ctrlNotas, 'Notas', maxLines: 3),
         ]),
@@ -542,7 +541,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   InputDecoration _inputDeco(String label, {IconData? icon}) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(fontSize: 13), // 🔥 Texto un poco más pequeño para que quepa mejor
+      labelStyle: const TextStyle(fontSize: 13),
       prefixIcon: icon != null ? Icon(icon, size: 18, color: const Color(0xFF1E3A8A)) : null,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
@@ -551,7 +550,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
 
   Widget _buildDropdown(String label, List<String> items, String? valor, Function(String?) onChanged) {
     return DropdownButtonFormField<String>(
-      isExpanded: true, // 🔥 Evita error si la opción es muy larga
+      isExpanded: true,
       value: valor,
       decoration: _inputDeco(label),
       items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 14)))).toList(),

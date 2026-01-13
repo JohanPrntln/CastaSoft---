@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     
     <application
-        android:label="castasoft"
+        android:label="Castasoft"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
         <activity
