@@ -64,3 +64,7 @@ flutter_launcher_icons:
   image_path: "assets/gallo_transparente.png"
   adaptive_icon_background: "#000000" 
   adaptive_icon_foreground: "assets/gallo_transparente.png"
+  windows:
+    generate: true
+    image_path: "assets/gallo_transparente.png"
+    icon_size: 256 # Tamaño ideal para Windows

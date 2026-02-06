@@ -447,7 +447,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         _buildCard('Estado Actual', [
           _buildResponsiveDualInput(
             _buildDropdown('Estado', ['Activo', 'Vendido', 'Baja', 'Retirado'], _estado, (v) => setState(() => _estado = v)),
-            _buildDropdown('Etapa', ['Cría', 'Levante', 'Muda', 'Postura', 'Padrote','Madrilla'], _etapaVida, (v) => setState(() => _etapaVida = v))
+            _buildDropdown('Etapa', ['Cría', 'Levante', 'Muda', 'Postura', 'Padrote', 'Madrilla', 'Combate', 'Descanso'], _etapaVida, (v) => setState(() => _etapaVida = v))
           ),
           const SizedBox(height: 15),
           _buildResponsiveDualInput(
@@ -470,7 +470,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     );
   }
 
-  // PESTAÑA 4 (🔥 AQUÍ ESTÁ EL CAMBIO DEL LABEL)
+  // PESTAÑA 4
   Widget _buildTabFinanzas() {
     return ListView(
       padding: const EdgeInsets.all(20),

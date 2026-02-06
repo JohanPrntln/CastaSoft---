@@ -14,8 +14,6 @@ import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/proveedores/usuario_proveedor.dart';
 import 'package:castasoft/pantallas/pantalla_lista_cruces.dart';
 import 'package:castasoft/pantallas/pantalla_configuracion_perfil.dart';
-import 'package:castasoft/servicios/servicio_firestore.dart';
-
 
 class PantallaInicio extends StatefulWidget {
   const PantallaInicio({Key? key}) : super(key: key);
@@ -26,7 +24,10 @@ class PantallaInicio extends StatefulWidget {
 
 class _PantallaInicioState extends State<PantallaInicio> {
   late TextEditingController _buscarController;
-  String _filtroSeleccionado = 'Todos';
+  
+  // Variables de estado para los filtros
+  String _filtroEstadoSeleccionado = 'Todos'; 
+  String _filtroEtapaSeleccionado = 'Todas';  
 
   @override
   void initState() {
@@ -44,7 +45,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
     super.dispose();
   }
 
-  // --- LÓGICA PARA CERRAR SESIÓN ---
+  // --- LÓGICA PARA CERRAR SESIÓN (INTACTA) ---
   Future<void> _confirmarCierreSesion() async {
     final confirmar = await showDialog<bool>(
       context: context,
@@ -54,33 +55,18 @@ class _PantallaInicioState extends State<PantallaInicio> {
           children: [
             const Icon(Icons.warning_amber_rounded, color: Colors.orange),
             const SizedBox(width: 10),
-            Text(
-              'Cerrar Sesión',
-              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-            ),
+            Text('Cerrar Sesión', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
           ],
         ),
-        content: Text(
-          '¿Estás seguro de que deseas salir de CastaSoft?',
-          style: GoogleFonts.poppins(),
-        ),
+        content: Text('¿Estás seguro de que deseas salir de CastaSoft?', style: GoogleFonts.poppins()),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text(
-              'Cancelar',
-              style: GoogleFonts.poppins(color: Colors.grey),
-            ),
+            child: Text('Cancelar', style: GoogleFonts.poppins(color: Colors.grey)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              'Sí, Salir',
-              style: GoogleFonts.poppins(
-                color: Colors.red,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            child: Text('Sí, Salir', style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -89,9 +75,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
     if (confirmar == true && mounted) {
       await context.read<ServicioFirestore>().cerrarSesion();
       if (mounted) {
-        Navigator.of(
-          context,
-        ).pushNamedAndRemoveUntil('/login', (route) => false);
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
       }
     }
   }
@@ -100,16 +84,17 @@ class _PantallaInicioState extends State<PantallaInicio> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-
-      // 🔥 CAMBIO IMPORTANTE: Quitamos 'appBar' y usamos SafeArea + Column
-      // Esto permite que el encabezado cambie de tamaño sin romper la pantalla.
+      // SafeArea + Column asegura que el encabezado no se corte en iPhone o Android con Notch
       body: SafeArea(
         child: Column(
           children: [
-            // 1. EL ENCABEZADO RESPONSIVE (Se ajusta solo)
+            // 1. ENCABEZADO RESPONSIVE
             _construirEncabezado(context),
 
-            // 2. EL RESTO DE LA PANTALLA (CON SCROLL)
+            // 2. BARRA DE FILTROS (CHIPS)
+            _construirBarraFiltros(),
+
+            // 3. CONTENIDO CON SCROLL
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
@@ -120,18 +105,15 @@ class _PantallaInicioState extends State<PantallaInicio> {
           ],
         ),
       ),
-
-      // BOTÓN FLOTANTE
+      
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(
-              builder: (context) => const PantallaFormularioGallo(),
-            ),
+            MaterialPageRoute(builder: (context) => const PantallaFormularioGallo()),
           );
         },
-        backgroundColor: const Color(0xFFD4AF37), // Dorado Premium
+        backgroundColor: const Color(0xFFD4AF37),
         elevation: 4,
         tooltip: 'Registrar Nuevo Gallo',
         child: const Icon(FontAwesomeIcons.plus, color: Color(0xFF1E3A8A)),
@@ -140,7 +122,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
   }
 
   // ===========================================================================
-  // 🧩 SECCIÓN DE ENCABEZADO RESPONSIVO (LAYOUT BUILDER)
+  // 🧩 ENCABEZADO RESPONSIVE
   // ===========================================================================
 
   Widget _construirEncabezado(BuildContext context) {
@@ -149,34 +131,30 @@ class _PantallaInicioState extends State<PantallaInicio> {
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
-        boxShadow: [
-          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
-        ],
       ),
+      // LayoutBuilder detecta el ancho de la pantalla
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // Si el ancho es mayor a 700px, es Tablet/PC
-          bool esPantallaAncha = constraints.maxWidth > 700;
+          bool esPantallaAncha = constraints.maxWidth > 700; // Tablet o PC
 
           if (esPantallaAncha) {
-            // 🖥️ MODO ESCRITORIO (1 FILA)
+            // Fila única para pantallas grandes
             return Row(
               children: [
                 _buildPerfilClickeable(context),
                 const Spacer(),
-                _buildBuscador(ancho: 350), // Barra larga
+                _buildBuscador(ancho: 350), 
                 const SizedBox(width: 15),
-                _buildFiltro(),
+                _buildFiltroEstado(),
                 const SizedBox(width: 15),
                 _buildBotonSalir(),
               ],
             );
           } else {
-            // 📱 MODO CELULAR (2 FILAS)
+            // Columna (2 filas) para celulares
             return Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Fila 1: Logo y Salir
                 Row(
                   children: [
                     _buildPerfilClickeable(context),
@@ -185,12 +163,11 @@ class _PantallaInicioState extends State<PantallaInicio> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Fila 2: Buscador y Filtro
                 Row(
                   children: [
                     Expanded(child: _buildBuscador(ancho: double.infinity)),
                     const SizedBox(width: 10),
-                    _buildFiltro(compacto: true),
+                    _buildFiltroEstado(compacto: true),
                   ],
                 ),
               ],
@@ -201,236 +178,172 @@ class _PantallaInicioState extends State<PantallaInicio> {
     );
   }
 
-  // --- PIEZAS DEL ENCABEZADO ---
+  // 🔥 BARRA DE FILTROS DESLIZABLE (CHIPS)
+  Widget _construirBarraFiltros() {
+    final etapas = ['Todas', 'Cría', 'Levante', 'Muda', 'Postura', 'Padrote', 'Madrilla', 'Combate', 'Descanso'];
 
-  // 1. PERFIL
-  Widget _buildPerfilClickeable(BuildContext context) {
-    return Consumer<UsuarioProveedor>(
-      builder: (context, usuarioProv, child) {
-        final perfil = usuarioProv.perfil;
-
-        void irAEditar() {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => PantallaConfiguracionPerfil(perfilEditar: perfil),
-            ),
-          );
-        }
-
-        Widget widgetLogo;
-        if (perfil?.logoPath != null &&
-            perfil!.logoPath!.startsWith('base64,')) {
-          try {
-            final bytes = base64Decode(perfil.logoPath!.split(',').last);
-            widgetLogo = ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.memory(
-                bytes,
-                height: 50,
-                width: 50,
-                fit: BoxFit.cover,
-              ),
-            );
-          } catch (e) {
-            widgetLogo = _logoIcono();
-          }
-        } else {
-          widgetLogo = _logoIcono();
-        }
-
-        return InkWell(
-          onTap: irAEditar,
-          borderRadius: BorderRadius.circular(12),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
-                ),
-                child: widgetLogo,
-              ),
-              const SizedBox(width: 12),
-
-              Flexible(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      perfil?.nombreCastadero ?? 'Mi Criadero',
-                      style: GoogleFonts.poppins(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF1E3A8A),
-                      ),
-                      maxLines: 2, // Permite 2 líneas
-                      overflow: TextOverflow.visible,
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          perfil?.nombrePropietario ?? 'Propietario',
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            color: Colors.grey,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.edit,
-                          size: 10,
-                          color: Colors.blueGrey,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // 2. BUSCADOR
-  Widget _buildBuscador({required double ancho}) {
     return Container(
-      width: ancho,
-      height: 45,
-      child: TextField(
-        controller: _buscarController,
-        decoration: InputDecoration(
-          hintText: 'Buscar placa, nombre, padre...',
-          hintStyle: GoogleFonts.poppins(
-            fontSize: 13,
-            color: Colors.grey.shade400,
-          ),
-          prefixIcon: const Icon(
-            FontAwesomeIcons.magnifyingGlass,
-            size: 16,
-            color: Colors.grey,
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            vertical: 0,
-            horizontal: 15,
-          ),
-          filled: true,
-          fillColor: Colors.grey.shade50,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade200),
-          ),
-        ),
-        onChanged: (value) =>
-            context.read<GallosProveedor>().setFiltroTexto(value),
-      ),
-    );
-  }
-
-  // 3. FILTRO
-  Widget _buildFiltro({bool compacto = false}) {
-    return Container(
-      height: 45,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      height: 60,
+      width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 4, offset: const Offset(0, 4)),
+        ],
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _filtroSeleccionado,
-          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            color: Colors.black87,
-            fontWeight: FontWeight.w500,
-          ),
-          items: ['Todos', 'Activo', 'Vendido', 'Retirado'].map((String value) {
-            return DropdownMenuItem<String>(value: value, child: Text(value));
-          }).toList(),
-          onChanged: (val) {
-            context.read<GallosProveedor>().setFiltroEstado(val ?? 'Todos');
-            setState(() => _filtroSeleccionado = val ?? 'Todos');
-          },
-        ),
-      ),
-    );
-  }
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        scrollDirection: Axis.horizontal,
+        itemCount: etapas.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final etapa = etapas[index];
+          final estaSeleccionado = _filtroEtapaSeleccionado == etapa;
 
-  // 4. BOTÓN SALIR
-  Widget _buildBotonSalir() {
-    return Tooltip(
-      message: 'Cerrar Sesión',
-      child: InkWell(
-        onTap: _confirmarCierreSesion,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.red.shade50,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(
-            FontAwesomeIcons.rightFromBracket,
-            size: 18,
-            color: Colors.red.shade400,
-          ),
-        ),
+          return ChoiceChip(
+            label: Text(
+              etapa,
+              style: TextStyle(
+                color: estaSeleccionado ? Colors.white : const Color(0xFF1E3A8A),
+                fontWeight: estaSeleccionado ? FontWeight.bold : FontWeight.normal,
+                fontSize: 13,
+              ),
+            ),
+            selected: estaSeleccionado,
+            selectedColor: const Color(0xFF1E3A8A),
+            backgroundColor: const Color(0xFFF1F5F9),
+            onSelected: (bool selected) {
+              setState(() {
+                _filtroEtapaSeleccionado = selected ? etapa : 'Todas';
+              });
+              context.read<GallosProveedor>().setFiltroEtapa(_filtroEtapaSeleccionado);
+            },
+          );
+        },
       ),
     );
   }
 
   // ===========================================================================
-  // 🧩 CONTENIDO DEL DASHBOARD
+  // 🧩 CONTENIDO DASHBOARD
   // ===========================================================================
 
   Widget _construirContenidoDashboard(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _construirSeccionEstadisticas(),
           const SizedBox(height: 20),
           _buildTarjetaModuloCruces(),
-          const SizedBox(height: 30),
+          const SizedBox(height: 25),
           _construirSeccionListaReciente(),
         ],
       ),
     );
   }
 
-  // ESTADÍSTICAS (Activos / Vendidos)
+  // 🔥 TARJETAS DE ESTADÍSTICAS (Activos y Vendidos)
   Widget _construirSeccionEstadisticas() {
     return Consumer<GallosProveedor>(
       builder: (context, gallosProveedor, child) {
-        final estadisticas = gallosProveedor.obtenerEstadisticas();
-        return Row(
+        final conteoDetallado = gallosProveedor.obtenerConteoDetallado();
+        final estadisticasGenerales = gallosProveedor.obtenerEstadisticas();
+
+        return Column(
           children: [
-            Expanded(
-              child: _buildTarjetaResumen(
-                titulo: 'Activos',
-                valor: estadisticas['activos'] ?? 0,
-                icono: FontAwesomeIcons.kiwiBird,
-                colores: [const Color(0xFF1E3A8A), const Color(0xFF3B82F6)],
+            // 1. TARJETA AZUL (ACTIVOS + DESGLOSE)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(color: const Color(0xFF1E3A8A).withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4)),
+                ],
+              ),
+              child: Column(
+                children: [
+                  // Fila Superior
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Total Activos', style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14)),
+                          Text(
+                            '${conteoDetallado['total']}',
+                            style: GoogleFonts.poppins(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+                        // CAMBIO DE ICONO: Pluma en vez de KiwiBird
+                        child: const Icon(FontAwesomeIcons.featherPointed, color: Colors.white, size: 24),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(color: Colors.white24),
+                  const SizedBox(height: 10),
+                  // Fila Inferior (Desglose)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildMiniDato('Padrotes', '${conteoDetallado['padrotes']}', FontAwesomeIcons.mars),
+                      _buildMiniDato('Madrillas', '${conteoDetallado['madrillas']}', FontAwesomeIcons.venus),
+                      _buildMiniDato('Cría', '${conteoDetallado['crias']}', FontAwesomeIcons.egg),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildTarjetaResumen(
-                titulo: 'Vendidos',
-                valor: estadisticas['vendidos'] ?? 0,
-                icono: FontAwesomeIcons.sackDollar,
-                colores: [const Color(0xFFD4AF37), const Color(0xFFF59E0B)],
+
+            const SizedBox(height: 16),
+
+            // 2. TARJETA DORADA (VENDIDOS) - RESTAURADO COLOR ORIGINAL
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFD4AF37), Color(0xFFF59E0B)], // Dorado original
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(color: const Color(0xFFD4AF37).withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4)),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Total Vendidos', style: GoogleFonts.poppins(color: Colors.white.withOpacity(0.9), fontSize: 14)),
+                      Text(
+                        '${estadisticasGenerales['vendidos']}',
+                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+                    child: const Icon(FontAwesomeIcons.sackDollar, color: Colors.white, size: 24),
+                  ),
+                ],
               ),
             ),
           ],
@@ -439,111 +352,46 @@ class _PantallaInicioState extends State<PantallaInicio> {
     );
   }
 
-  // Helper Tarjeta Resumen
-  Widget _buildTarjetaResumen({
-    required String titulo,
-    required int valor,
-    required IconData icono,
-    required List<Color> colores,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: colores,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: colores.first.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icono, color: Colors.white, size: 20),
-          ),
-          const SizedBox(height: 15),
-          Text(
-            valor.toString(),
-            style: GoogleFonts.poppins(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          Text(
-            titulo,
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              color: Colors.white.withOpacity(0.9),
-            ),
-          ),
-        ],
-      ),
+  Widget _buildMiniDato(String label, String valor, IconData icono) {
+    return Column(
+      children: [
+        Icon(icono, color: Colors.white70, size: 14),
+        const SizedBox(height: 4),
+        Text(valor, style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(label, style: GoogleFonts.poppins(color: Colors.white54, fontSize: 10)),
+      ],
     );
   }
 
-  // TARJETA CRUCES (Verde)
+  // TARJETA CRUCES
   Widget _buildTarjetaModuloCruces() {
     return InkWell(
-      onTap: () {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const PantallaListaCruces()));
-      },
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PantallaListaCruces())),
       borderRadius: BorderRadius.circular(20),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF059669), Color(0xFF34D399)], 
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          gradient: const LinearGradient(colors: [Color(0xFF059669), Color(0xFF34D399)], begin: Alignment.topLeft, end: Alignment.bottomRight),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(color: const Color(0xFF059669).withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4)),
-          ],
+          boxShadow: [BoxShadow(color: const Color(0xFF059669).withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // 🔥 CAMBIO CLAVE: Expanded atrapa el texto para que no empuje
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Cruces y Genética',
-                    style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
+                  Text('Cruces y Genética', style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 5),
-                  // 🔥 CAMBIO CLAVE: Agregamos overflow para cortar si es muy largo
-                  Text(
-                    'Gestiona camadas, padres y nacimientos',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                    overflow: TextOverflow.ellipsis, // Pone "..." si no cabe
-                    maxLines: 2, // Permite que baje máximo a 2 renglones
-                  ),
+                  const Text('Gestiona camadas, padres y nacimientos', style: TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis, maxLines: 2),
                 ],
               ),
             ),
-            const SizedBox(width: 15), // Un respiro entre texto e icono
+            const SizedBox(width: 15),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
-              // El icono ahora nunca se saldrá
               child: const Icon(FontAwesomeIcons.dna, color: Colors.white, size: 24),
             ),
           ],
@@ -561,13 +409,15 @@ class _PantallaInicioState extends State<PantallaInicio> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Inventario Reciente',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF1E3A8A),
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _filtroEtapaSeleccionado == "Todas" ? 'Inventario Completo' : 'Lista de $_filtroEtapaSeleccionado',
+                  style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: const Color(0xFF1E3A8A)),
+                ),
+                Text('${gallos.length} resultados', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
+              ],
             ),
             const SizedBox(height: 16),
             if (gallos.isEmpty)
@@ -577,27 +427,15 @@ class _PantallaInicioState extends State<PantallaInicio> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
                 ),
                 child: Center(
                   child: Column(
                     children: [
-                      Icon(
-                        FontAwesomeIcons.kiwiBird,
-                        size: 40,
-                        color: Colors.grey.shade300,
-                      ),
+                      // Cambio de icono aquí también si quieres
+                      Icon(FontAwesomeIcons.featherPointed, size: 40, color: Colors.grey.shade300),
                       const SizedBox(height: 10),
-                      Text(
-                        'No hay gallos registrados aún',
-                        style: GoogleFonts.poppins(color: Colors.grey),
-                      ),
+                      Text('No se encontraron gallos', style: GoogleFonts.poppins(color: Colors.grey)),
                     ],
                   ),
                 ),
@@ -607,8 +445,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: gallos.length,
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 12),
+                separatorBuilder: (context, index) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final gallo = gallos[index];
                   return GestureDetector(
@@ -618,16 +455,10 @@ class _PantallaInicioState extends State<PantallaInicio> {
                       onEdit: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                PantallaFormularioGallo(galloEditar: gallo),
-                          ),
-                        ).then(
-                          (_) => context.read<GallosProveedor>().cargarGallos(),
-                        );
+                          MaterialPageRoute(builder: (context) => PantallaFormularioGallo(galloEditar: gallo)),
+                        ).then((_) => context.read<GallosProveedor>().cargarGallos());
                       },
-                      onDelete: () =>
-                          _mostrarConfirmacionEliminar(context, gallo),
+                      onDelete: () => _mostrarConfirmacionEliminar(context, gallo),
                     ),
                   );
                 },
@@ -638,90 +469,145 @@ class _PantallaInicioState extends State<PantallaInicio> {
     );
   }
 
-  // ... MÉTODOS DE NAVEGACIÓN Y HELPERS ...
+  // --- HELPERS Y PERFIL ---
+
+  Widget _buildPerfilClickeable(BuildContext context) {
+    return Consumer<UsuarioProveedor>(
+      builder: (context, usuarioProv, child) {
+        final perfil = usuarioProv.perfil;
+        void irAEditar() {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => PantallaConfiguracionPerfil(perfilEditar: perfil)));
+        }
+
+        Widget widgetLogo;
+        if (perfil?.logoPath != null && perfil!.logoPath!.startsWith('base64,')) {
+          try {
+            final bytes = base64Decode(perfil.logoPath!.split(',').last);
+            widgetLogo = ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.memory(bytes, height: 45, width: 45, fit: BoxFit.cover));
+          } catch (e) { widgetLogo = _logoIcono(); }
+        } else {
+          widgetLogo = _logoIcono();
+        }
+
+        return InkWell(
+          onTap: irAEditar,
+          borderRadius: BorderRadius.circular(12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0), width: 1)),
+                child: widgetLogo,
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(perfil?.nombreCastadero ?? 'Mi Criadero', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A))),
+                  Text(perfil?.nombrePropietario ?? 'Propietario', style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey)),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBuscador({required double ancho}) {
+    return Container(
+      width: ancho,
+      height: 40,
+      child: TextField(
+        controller: _buscarController,
+        decoration: InputDecoration(
+          hintText: 'Buscar placa, nombre...',
+          hintStyle: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade400),
+          prefixIcon: const Icon(FontAwesomeIcons.magnifyingGlass, size: 14, color: Colors.grey),
+          contentPadding: const EdgeInsets.symmetric(vertical: 0),
+          filled: true,
+          fillColor: Colors.grey.shade100,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+        ),
+        onChanged: (value) => context.read<GallosProveedor>().setFiltroTexto(value),
+      ),
+    );
+  }
+
+  Widget _buildFiltroEstado({bool compacto = false}) {
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.grey.shade300)),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _filtroEstadoSeleccionado,
+          icon: const Icon(Icons.filter_list, size: 18, color: Colors.grey),
+          style: GoogleFonts.poppins(fontSize: 12, color: Colors.black87),
+          items: ['Todos', 'Activo', 'Vendido', 'Retirado'].map((String value) => DropdownMenuItem<String>(value: value, child: Text(value))).toList(),
+          onChanged: (val) {
+            context.read<GallosProveedor>().setFiltroEstado(val ?? 'Todos');
+            setState(() => _filtroEstadoSeleccionado = val ?? 'Todos');
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBotonSalir() {
+    return InkWell(
+      onTap: _confirmarCierreSesion,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(10)),
+        child: Icon(FontAwesomeIcons.rightFromBracket, size: 16, color: Colors.red.shade400),
+      ),
+    );
+  }
+
   Future<void> _navegarADetalleGallo(BuildContext context, Gallo gallo) async {
     final resultado = await Navigator.push<String>(
       context,
-      MaterialPageRoute(
-        builder: (context) => PantallaDetalleGallo(gallo: gallo),
-      ),
+      MaterialPageRoute(builder: (context) => PantallaDetalleGallo(gallo: gallo)),
     );
-
     if (resultado == 'editar' && mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PantallaFormularioGallo(galloEditar: gallo),
-        ),
-      ).then((_) => context.read<GallosProveedor>().cargarGallos());
+      Navigator.push(context, MaterialPageRoute(builder: (context) => PantallaFormularioGallo(galloEditar: gallo))).then((_) => context.read<GallosProveedor>().cargarGallos());
     } else if (resultado == 'eliminar' && mounted) {
       _mostrarConfirmacionEliminar(context, gallo);
     }
   }
 
-  Future<void> _mostrarConfirmacionEliminar(
-    BuildContext context,
-    Gallo gallo,
-  ) async {
+  Future<void> _mostrarConfirmacionEliminar(BuildContext context, Gallo gallo) async {
     final confirmar = await showDialog<bool>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Confirmar Eliminación'),
-          content: Text('¿Está seguro que desea eliminar a ${gallo.nombre}?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancelar'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text(
-                'Eliminar',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
-        );
-      },
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmar Eliminación'),
+        content: Text('¿Está seguro que desea eliminar a ${gallo.nombre}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Eliminar', style: TextStyle(color: Colors.red))),
+        ],
+      ),
     );
 
     if (confirmar == true) {
       try {
         await context.read<GallosProveedor>().eliminarGallo(gallo.id);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Eliminado correctamente'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Eliminado correctamente'), backgroundColor: Colors.green));
       } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-          );
-        }
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
       }
     }
   }
 
-  // ✅ ESTE ES EL ICONO QUE DABA ERROR (AHORA SOLO APARECE UNA VEZ AQUÍ)
   Widget _logoIcono() {
     return Container(
-      width: 50,
-      height: 50,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E3A8A).withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Icon(
-        FontAwesomeIcons.houseUser,
-        color: Color(0xFF1E3A8A),
-        size: 24,
-      ),
+      width: 45, height: 45,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(color: const Color(0xFF1E3A8A).withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
+      child: const Icon(FontAwesomeIcons.houseUser, color: Color(0xFF1E3A8A), size: 20),
     );
   }
 }
