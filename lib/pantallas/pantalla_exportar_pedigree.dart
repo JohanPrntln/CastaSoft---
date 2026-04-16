@@ -35,6 +35,7 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
   late TextEditingController _razaCtrl;
   late TextEditingController _pesoCtrl;
   late TextEditingController _colorCtrl; 
+  late TextEditingController _fechaNacCtrl; // 🔥 NUEVO: Controlador para Fecha de Nacimiento
   late TextEditingController _criaderoCtrl;
   late TextEditingController _padreCtrl;
   late TextEditingController _madreCtrl;
@@ -74,6 +75,11 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
     _pesoCtrl = TextEditingController(text: '${widget.gallo.pesoActual ?? "--"} Lbs');
     _colorCtrl = TextEditingController(text: widget.gallo.colorPluma); 
     
+    // 🔥 Extraemos la fecha de nacimiento directamente del registro y le damos formato
+    _fechaNacCtrl = TextEditingController(
+      text: DateFormat('dd/MM/yyyy').format(widget.gallo.fechaNacimiento)
+    );
+    
     // 2. Datos Usuario
     final usuarioProv = context.read<UsuarioProveedor>();
     final UsuarioPerfil? usuario = usuarioProv.perfil; 
@@ -105,7 +111,7 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
   @override
   void dispose() {
     _nombreCtrl.dispose(); _placaCtrl.dispose(); _razaCtrl.dispose(); _pesoCtrl.dispose(); 
-    _colorCtrl.dispose(); _criaderoCtrl.dispose();
+    _colorCtrl.dispose(); _fechaNacCtrl.dispose(); _criaderoCtrl.dispose(); 
     _padreCtrl.dispose(); _madreCtrl.dispose();
     _abueloPCtrl.dispose(); _abuelaPCtrl.dispose(); _abueloMCtrl.dispose(); _abuelaMCtrl.dispose();
     _whatsappCtrl.dispose(); _linkExtraCtrl.dispose(); _labelQrDerechoCtrl.dispose(); _firmaCtrl.dispose();
@@ -183,10 +189,14 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
     const double topLinea  = 240.0;  // 3er Renglón
     const double topPeso   = 259.0;  // 4to Renglón
     const double topColor  = 279.0;  // 5to Renglón
+    const double topFechaNac = 299.0; // 🔥 6to Renglón (Fecha de Nacimiento)
 
     const double topPadres = 363.0;
     const double topAbuelos1 = 417.0; 
     const double topAbuelos2 = 435.0; 
+
+    // Altura para las etiquetas de "Padre" y "Madre"
+    const double topEtiquetasPadres = 350.0; 
 
     const Color textoCafeArmonico = Color(0xFF4E342E); 
     const Color textoCafeTitulo = Color(0xFF5D4037); 
@@ -262,6 +272,13 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
                         _datoEnLienzo('Línea:', _razaCtrl.text, topLinea, leftDatos, maxWidth: 160, colorBase: textoCafeArmonico),
                         _datoEnLienzo('Peso:', _pesoCtrl.text, topPeso, leftDatos, maxWidth: 160, colorBase: textoCafeArmonico),
                         _datoEnLienzo('Color:', _colorCtrl.text, topColor, leftDatos, maxWidth: 160, colorBase: textoCafeArmonico),
+                        
+                        // 🔥 MODIFICADO: F. Nacimiento en el lienzo
+                        _datoEnLienzo('F. Nac:', _fechaNacCtrl.text, topFechaNac, leftDatos, maxWidth: 160, colorBase: textoCafeArmonico),
+
+                        // ETIQUETAS "PADRE" Y "MADRE"
+                        _etiquetaPadreMadre('Padre', top: topEtiquetasPadres, left: 80, width: 120, color: Colors.black54),
+                        _etiquetaPadreMadre('Madre', top: topEtiquetasPadres, left: 210, width: 120, color: Colors.black54),
 
                         // 6. GENEALOGÍA PADRES
                         _textoGenealogia(_padreCtrl.text, top: topPadres, left: 80, width: 120, color: const Color(0xFF1565C0)), // Azul
@@ -278,7 +295,6 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
                         Positioned(bottom: 43, left: 63, child: SizedBox(width: 60, child: Text("WhatsApp", textAlign: TextAlign.center, style: GoogleFonts.poppins(fontSize: 8, fontWeight: FontWeight.bold)))),
 
                         // QR DERECHO OPCIONAL
-                        // Solo se muestra si el usuario escribió algo en el link
                         if (_linkExtraCtrl.text.isNotEmpty)
                           Positioned(
                             bottom: 63, 
@@ -330,8 +346,12 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
                 children: [
                   _seccionTitulo('1. DATOS DEL CERTIFICADO'),
                   _input('Nombre del Gallo', _nombreCtrl),
-                  Row(children: [Expanded(child: _input('Placa', _placaCtrl)), SizedBox(width: 10), Expanded(child: _input('Línea/Raza', _razaCtrl))]),
-                  Row(children: [Expanded(child: _input('Peso', _pesoCtrl)), SizedBox(width: 10), Expanded(child: _input('Color Pluma', _colorCtrl))]),
+                  Row(children: [Expanded(child: _input('Placa', _placaCtrl)), const SizedBox(width: 10), Expanded(child: _input('Línea/Raza', _razaCtrl))]),
+                  Row(children: [Expanded(child: _input('Peso', _pesoCtrl)), const SizedBox(width: 10), Expanded(child: _input('Color Pluma', _colorCtrl))]),
+                  
+                  // 🔥 MODIFICADO: Formulario muestra "Fecha de Nacimiento"
+                  _input('Fecha de Nacimiento', _fechaNacCtrl, icon: FontAwesomeIcons.calendarDay),
+                  
                   _input('Nombre del Criadero', _criaderoCtrl, icon: FontAwesomeIcons.houseFlag),
 
                   const SizedBox(height: 15),
@@ -386,12 +406,10 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
                   const SizedBox(height: 10),
                   _input('Firma', _firmaCtrl, icon: FontAwesomeIcons.signature),
                   
-                  // SECCIÓN OPCIONAL CLARA
                   _seccionTitulo('4. QR DERECHO (OPCIONAL)'),
                   const Text("Si dejas esto vacío, no saldrá el QR derecho.", style: TextStyle(fontSize: 12, color: Colors.grey)),
                   const SizedBox(height: 10),
                   _input('Enlace Extra (Ej: Facebook/Instagram)', _linkExtraCtrl, icon: FontAwesomeIcons.link),
-                  // Solo mostrar input de etiqueta si hay link
                   if (_linkExtraCtrl.text.isNotEmpty)
                     _input('Texto debajo del QR (Ej: Síguenos)', _labelQrDerechoCtrl, icon: Icons.label),
                   
@@ -455,6 +473,24 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
     );
   }
 
+  Widget _etiquetaPadreMadre(String texto, {required double top, required double left, required double width, required Color color}) {
+    return Positioned(
+      top: top, left: left,
+      child: Container(
+        width: width, alignment: Alignment.center,
+        child: Text(
+          texto, 
+          textAlign: TextAlign.center, 
+          style: GoogleFonts.poppins(
+            fontSize: 8, 
+            fontWeight: FontWeight.w500, 
+            color: color
+          )
+        ),
+      ),
+    );
+  }
+
   Widget _textoGenealogia(String texto, {required double top, required double left, required double width, required Color color, double size = 11}) {
     return Positioned(
       top: top, left: left,
@@ -489,10 +525,8 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
     return Container(width: w, height: h, decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(4), image: imagen != null ? DecorationImage(image: imagen, fit: BoxFit.cover) : null, border: Border.all(color: const Color(0xFFD4AF37), width: 1.5)), child: imagen == null ? Icon(Icons.camera_alt, color: Colors.grey.shade400) : null);
   }
 
-  // 🔥 ARREGLO VISUAL DEL QR 🔥
   Widget _construirQR(String data) {
     return Container(
-      // Sin padding en el contenedor para ganar espacio
       decoration: BoxDecoration(
         color: Colors.white, 
         borderRadius: BorderRadius.circular(2) 
@@ -500,7 +534,6 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
       child: QrImageView(
         data: data, 
         version: QrVersions.auto, 
-        // Aumentamos tamaño y reducimos padding interno para que llene el cuadro
         size: 54.0, 
         backgroundColor: Colors.white, 
         padding: const EdgeInsets.all(2.0), 
