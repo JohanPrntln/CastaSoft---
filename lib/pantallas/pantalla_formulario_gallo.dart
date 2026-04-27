@@ -406,7 +406,18 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
             isExpanded: true,
             value: _padreId,
             items: padres.map((g) => DropdownMenuItem(value: g.id, child: Text('${g.nombre} (${g.placa})', overflow: TextOverflow.ellipsis))).toList(),
-            onChanged: (v) => setState(() => _padreId = v),
+            onChanged: (v) {
+              setState(() {
+                _padreId = v;
+                // 🔥 MAGIA: Auto-llenado en cascada para la rama paterna
+                if (v != null) {
+                  final padreSeleccionado = padres.firstWhere((g) => g.id == v);
+                  _ctrlNombrePadre.text = padreSeleccionado.nombre;
+                  _ctrlAbueloPaterno.text = padreSeleccionado.nombrePadre ?? '';
+                  _ctrlAbuelaPaterna.text = padreSeleccionado.nombreMadre ?? '';
+                }
+              });
+            },
             decoration: _inputDeco('Padre (Macho)'),
           ),
           const SizedBox(height: 10),
@@ -414,7 +425,18 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
             isExpanded: true,
             value: _madreId,
             items: madres.map((g) => DropdownMenuItem(value: g.id, child: Text('${g.nombre} (${g.placa})', overflow: TextOverflow.ellipsis))).toList(),
-            onChanged: (v) => setState(() => _madreId = v),
+            onChanged: (v) {
+              setState(() {
+                _madreId = v;
+                // 🔥 MAGIA: Auto-llenado en cascada para la rama materna
+                if (v != null) {
+                  final madreSeleccionada = madres.firstWhere((g) => g.id == v);
+                  _ctrlNombreMadre.text = madreSeleccionada.nombre;
+                  _ctrlAbueloMaterno.text = madreSeleccionada.nombrePadre ?? '';
+                  _ctrlAbuelaMaterna.text = madreSeleccionada.nombreMadre ?? '';
+                }
+              });
+            },
             decoration: _inputDeco('Madre (Hembra)'),
           ),
         ]),
