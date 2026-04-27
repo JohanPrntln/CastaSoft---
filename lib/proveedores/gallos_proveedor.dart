@@ -59,6 +59,11 @@ class GallosProveedor extends ChangeNotifier {
   // ==================== GETTERS ====================
   List<Gallo> get gallos => List<Gallo>.unmodifiable(_gallos);
 
+  // 🔥 NUEVO: Getter que revisa si hay gallos con etiquetas viejas
+  bool get requiereActualizacionEtapa {
+    return _gallos.any((g) => g.etapaVida == 'Levante' || g.etapaVida == 'Descanso');
+  }
+
   // Getter inteligente con TODOS los filtros
   List<Gallo> get gallosFiltrados {
     List<Gallo> resultado = _gallos;
@@ -78,9 +83,15 @@ class GallosProveedor extends ChangeNotifier {
       resultado = resultado.where((gallo) => gallo.estado == _filtroEstado).toList();
     }
 
-    // 3. NUEVO: Filtro Etapa (Padrote, Madrilla...)
+    // 3. Filtro Etapa Modificado para la migración
     if (_filtroEtapa != 'Todas') {
-      resultado = resultado.where((gallo) => gallo.etapaVida == _filtroEtapa).toList();
+      if (_filtroEtapa == '⚠️ Actualizar') {
+        // Trae los gallos huérfanos
+        resultado = resultado.where((gallo) => gallo.etapaVida == 'Levante' || gallo.etapaVida == 'Descanso').toList();
+      } else {
+        // Trae los normales
+        resultado = resultado.where((gallo) => gallo.etapaVida == _filtroEtapa).toList();
+      }
     }
 
     return List<Gallo>.unmodifiable(resultado);

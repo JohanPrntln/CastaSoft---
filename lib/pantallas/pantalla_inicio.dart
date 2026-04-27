@@ -178,9 +178,18 @@ class _PantallaInicioState extends State<PantallaInicio> {
     );
   }
 
-  // 🔥 BARRA DE FILTROS DESLIZABLE (CHIPS)
+ // 🔥 BARRA DE FILTROS DESLIZABLE (CHIPS)
   Widget _construirBarraFiltros() {
-    final etapas = ['Todas', 'Cría', 'Levante', 'Muda', 'Postura', 'Padrote', 'Madrilla', 'Combate', 'Descanso'];
+    // Escuchamos al proveedor para saber si hay que mostrar el chip de advertencia
+    final requiereAct = context.watch<GallosProveedor>().requiereActualizacionEtapa;
+    
+    // Lista con los nombres NUEVOS
+    List<String> etapas = ['Todas', 'Cría', 'Pollos crestones', 'Pollonas', 'Muda', 'Postura', 'Padrote', 'Madrilla', 'Combate'];
+    
+    // Si hay gallos viejos, insertamos el chip rojo en la segunda posición
+    if (requiereAct) {
+      etapas.insert(1, '⚠️ Actualizar'); 
+    }
 
     return Container(
       height: 60,
@@ -199,24 +208,45 @@ class _PantallaInicioState extends State<PantallaInicio> {
         itemBuilder: (context, index) {
           final etapa = etapas[index];
           final estaSeleccionado = _filtroEtapaSeleccionado == etapa;
+          final esAdvertencia = etapa == '⚠️ Actualizar';
 
           return ChoiceChip(
             label: Text(
               etapa,
               style: TextStyle(
-                color: estaSeleccionado ? Colors.white : const Color(0xFF1E3A8A),
+                color: estaSeleccionado ? Colors.white : (esAdvertencia ? Colors.red.shade700 : const Color(0xFF1E3A8A)),
                 fontWeight: estaSeleccionado ? FontWeight.bold : FontWeight.normal,
                 fontSize: 13,
               ),
             ),
             selected: estaSeleccionado,
-            selectedColor: const Color(0xFF1E3A8A),
-            backgroundColor: const Color(0xFFF1F5F9),
+            // Color especial si es el chip de advertencia
+            selectedColor: esAdvertencia ? Colors.red.shade600 : const Color(0xFF1E3A8A),
+            backgroundColor: esAdvertencia ? Colors.red.shade50 : const Color(0xFFF1F5F9),
+            side: esAdvertencia ? BorderSide(color: Colors.red.shade200) : null,
             onSelected: (bool selected) {
               setState(() {
                 _filtroEtapaSeleccionado = selected ? etapa : 'Todas';
               });
               context.read<GallosProveedor>().setFiltroEtapa(_filtroEtapaSeleccionado);
+              
+              // 🔥 TU IDEA: Mensaje flotante explicativo
+              if (selected && esAdvertencia) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.white),
+                        SizedBox(width: 10),
+                        Expanded(child: Text('Las etapas "Levante" y "Descanso" se han cambiado. Por favor, edita estos animales y asígnales una nueva etapa.')),
+                      ],
+                    ),
+                    backgroundColor: Colors.red.shade800,
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 5),
+                  ),
+                );
+              }
             },
           );
         },

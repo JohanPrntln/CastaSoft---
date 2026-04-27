@@ -441,13 +441,20 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
 
   // PESTAÑA 3
   Widget _buildTabGestion() {
+    // 🔥 Truco Anti-Crash: Lista nueva, pero agregamos la vieja temporalmente si la tiene
+    List<String> etapasFormulario = ['Cría', 'Pollos crestones', 'Pollonas', 'Muda', 'Postura', 'Padrote', 'Madrilla', 'Combate'];
+    if (_etapaVida != null && !etapasFormulario.contains(_etapaVida)) {
+      etapasFormulario.add(_etapaVida!); 
+    }
+
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
         _buildCard('Estado Actual', [
           _buildResponsiveDualInput(
             _buildDropdown('Estado', ['Activo', 'Vendido', 'Baja', 'Retirado'], _estado, (v) => setState(() => _estado = v)),
-            _buildDropdown('Etapa', ['Cría', 'Levante', 'Muda', 'Postura', 'Padrote', 'Madrilla', 'Combate', 'Descanso'], _etapaVida, (v) => setState(() => _etapaVida = v))
+            // Pasamos la lista dinámica en vez de la estática
+            _buildDropdown('Etapa', etapasFormulario, _etapaVida, (v) => setState(() => _etapaVida = v))
           ),
           const SizedBox(height: 15),
           _buildResponsiveDualInput(
