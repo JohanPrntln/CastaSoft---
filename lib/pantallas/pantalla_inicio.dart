@@ -14,6 +14,7 @@ import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/proveedores/usuario_proveedor.dart';
 import 'package:castasoft/pantallas/pantalla_lista_cruces.dart';
 import 'package:castasoft/pantallas/pantalla_configuracion_perfil.dart';
+import 'package:castasoft/pantallas/pantalla_centro_seguridad.dart';
 
 class PantallaInicio extends StatefulWidget {
   const PantallaInicio({Key? key}) : super(key: key);
@@ -501,32 +502,75 @@ class _PantallaInicioState extends State<PantallaInicio> {
 
   // --- HELPERS Y PERFIL ---
 
-  Widget _buildPerfilClickeable(BuildContext context) {
+   Widget _buildPerfilClickeable(BuildContext context) {
     return Consumer<UsuarioProveedor>(
       builder: (context, usuarioProv, child) {
         final perfil = usuarioProv.perfil;
-        void irAEditar() {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => PantallaConfiguracionPerfil(perfilEditar: perfil)));
+        
+        // 🔥 NUEVO: Menú desplegable al tocar el perfil
+        void abrirMenuPerfil() {
+          showModalBottomSheet(
+            context: context,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            builder: (BuildContext ctx) {
+              return SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 10),
+                    // Pequeña barra gris indicadora de que se puede arrastrar
+                    Container(width: 40, height: 5, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10))),
+                    const SizedBox(height: 10),
+                    
+                    // Opción 1: Editar Perfil
+                    ListTile(
+                      leading: const Icon(FontAwesomeIcons.userPen, color: Color(0xFF1E3A8A)),
+                      title: const Text('Editar Perfil de Criador', style: TextStyle(fontWeight: FontWeight.w600)),
+                      onTap: () {
+                        Navigator.pop(ctx); // Cierra el menú
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => PantallaConfiguracionPerfil(perfilEditar: perfil)));
+                      },
+                    ),
+                    const Divider(height: 1),
+                    
+                    // Opción 2: Centro de Seguridad
+                    ListTile(
+                      leading: Icon(FontAwesomeIcons.shieldHalved, color: Colors.green.shade600),
+                      title: const Text('Centro de Seguridad y Reportes', style: TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: const Text('Copias de seguridad y exportación'),
+                      onTap: () {
+                        Navigator.pop(ctx); // Cierra el menú
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const PantallaCentroSeguridad()));
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              );
+            }
+          );
         }
 
         Widget widgetLogo;
         if (perfil?.logoPath != null && perfil!.logoPath!.startsWith('base64,')) {
           try {
             final bytes = base64Decode(perfil.logoPath!.split(',').last);
-            widgetLogo = ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.memory(bytes, height: 45, width: 45, fit: BoxFit.cover));
+            widgetLogo = ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.memory(bytes, height: 45, width: 45, fit: BoxFit.cover));
           } catch (e) { widgetLogo = _logoIcono(); }
         } else {
           widgetLogo = _logoIcono();
         }
 
         return InkWell(
-          onTap: irAEditar,
-          borderRadius: BorderRadius.circular(12),
+          onTap: abrirMenuPerfil, // 🔥 Ahora abre el menú en vez de ir directo a editar
+          borderRadius: BorderRadius.circular(16),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0), width: 1)),
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), border: Border.all(color: const Color(0xFFE2E8F0), width: 1.5)),
                 child: widgetLogo,
               ),
               const SizedBox(width: 12),
@@ -534,8 +578,8 @@ class _PantallaInicioState extends State<PantallaInicio> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(perfil?.nombreCastadero ?? 'Mi Criadero', style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A))),
-                  Text(perfil?.nombrePropietario ?? 'Propietario', style: GoogleFonts.poppins(fontSize: 11, color: Colors.grey)),
+                  Text(perfil?.nombreCastadero ?? 'Mi Criadero', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A))),
+                  Text(perfil?.nombrePropietario ?? 'Propietario', style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
                 ],
               ),
             ],

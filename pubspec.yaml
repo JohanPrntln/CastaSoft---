@@ -37,6 +37,7 @@ dependencies:
   share_plus: ^10.0.0
   qr_flutter: ^4.1.0
   gal: ^2.3.2
+  file_selector: ^1.1.0
 
 dev_dependencies:
   flutter_test:
