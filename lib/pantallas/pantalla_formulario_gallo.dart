@@ -1,780 +1,659 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; 
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:intl/intl.dart'; 
 import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
-/// Pantalla de Formulario para Crear/Editar Gallos
-///
-/// Esta pantalla permite:
-/// - Crear un nuevo gallo (si [galloEditar] es null)
-/// - Editar un gallo existente (si [galloEditar] no es null)
-/// - Validación de formulario completa
-/// - Selector de fecha para fecha de nacimiento
-/// - Selector de imagen para fotografía del gallo
-/// - Dropdowns para sexo y estado
+
 class PantallaFormularioGallo extends StatefulWidget {
-  /// Gallo a editar (null si es creación)
   final Gallo? galloEditar;
-
-  /// Constructor de la pantalla de formulario
   const PantallaFormularioGallo({Key? key, this.galloEditar}) : super(key: key);
 
   @override
-  State<PantallaFormularioGallo> createState() =>
-      _PantallaFormularioGalloState();
+  State<PantallaFormularioGallo> createState() => _PantallaFormularioGalloState();
 }
 
-class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> {
-  /// Clave global del formulario para validación
+class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with TickerProviderStateMixin {
   final _claveFormulario = GlobalKey<FormState>();
+  late TabController _tabController;
 
-  /// Controladores de texto para cada campo
-  late TextEditingController _controladorPlaca;
-  late TextEditingController _controladorNombre;
-  late TextEditingController _controladorLineaGenetica;
-  late TextEditingController _controladorColorPluma;
-  late TextEditingController _controladorFaseLunar;
-  late TextEditingController _controladorNotas;
-  late TextEditingController _controladorFechaNacimiento;
+  // ================== CONTROLADORES ==================
+  final TextEditingController _ctrlPlaca = TextEditingController();
+  final TextEditingController _ctrlNombre = TextEditingController();
+  final TextEditingController _ctrlLinea = TextEditingController();
+  final TextEditingController _ctrlColor = TextEditingController();
+  final TextEditingController _ctrlFase = TextEditingController();
+  final TextEditingController _ctrlFecha = TextEditingController();
+  
+  final TextEditingController _ctrlPesoActual = TextEditingController();
+  final TextEditingController _ctrlPesoCombate = TextEditingController();
+  final TextEditingController _ctrlJaula = TextEditingController();
+  final TextEditingController _ctrlCriadero = TextEditingController();
+  
+  final TextEditingController _ctrlNombrePadre = TextEditingController();
+  final TextEditingController _ctrlNombreMadre = TextEditingController();
+  final TextEditingController _ctrlAbueloPaterno = TextEditingController();
+  final TextEditingController _ctrlAbuelaPaterna = TextEditingController();
+  final TextEditingController _ctrlAbueloMaterno = TextEditingController();
+  final TextEditingController _ctrlAbuelaMaterna = TextEditingController();
 
-  /// Variables para almacenar selecciones
-  String? _sexoSeleccionado;
-  String? _estadoSeleccionado;
-  DateTime? _fechaNacimientoSeleccionada;
+  final TextEditingController _ctrlCosto = TextEditingController();
+  final TextEditingController _ctrlVenta = TextEditingController();
+  final TextEditingController _ctrlVideo = TextEditingController();
+  final TextEditingController _ctrlNotas = TextEditingController();
 
-  /// Ruta temporal de la fotografía seleccionada
-  String? _rutaFotoTemporal;
+  final TextEditingController _ctrlNuevaVacuna = TextEditingController();
+  final TextEditingController _ctrlNuevaPelea = TextEditingController();
 
-  /// Selector de imágenes desde la galería del dispositivo
-  final ImagePicker _selectorImagen = ImagePicker();
-
-  /// Indica si la pantalla está en modo edición
+  // ================== VARIABLES ==================
+  String? _sexo;
+  String? _estado;
+  String? _etapaVida;
+  String? _tipoCresta;
+  DateTime? _fechaNacimiento;
+  String? _padreId;
+  String? _madreId;
+  
   bool _esEdicion = false;
+  XFile? _imagenNuevaSeleccionada; 
+  String? _fotoActualBase64; 
+
+  List<String> _listaVacunas = [];
+  List<String> _listaPeleas = [];
+
+  final ImagePicker _picker = ImagePicker();
+  bool _estaGuardando = false;
 
   @override
   void initState() {
     super.initState();
-
-    // Inicializar controladores
-    _controladorPlaca = TextEditingController();
-    _controladorNombre = TextEditingController();
-    _controladorLineaGenetica = TextEditingController();
-    _controladorColorPluma = TextEditingController();
-    _controladorFaseLunar = TextEditingController();
-    _controladorNotas = TextEditingController();
-    _controladorFechaNacimiento = TextEditingController();
-
-    // Si hay gallo para editar, llenar los campos
+    _tabController = TabController(length: 4, vsync: this);
+    
     if (widget.galloEditar != null) {
-      _esEdicion = true;
-      final gallo = widget.galloEditar!;
-
-      _controladorPlaca.text = gallo.placa;
-      _controladorNombre.text = gallo.nombre;
-      _controladorLineaGenetica.text = gallo.lineaGenetica;
-      _controladorColorPluma.text = gallo.colorPluma;
-      _controladorFaseLunar.text = gallo.faseLunar;
-      _controladorNotas.text = gallo.notas ?? '';
-      _controladorFechaNacimiento.text = _formatearFecha(gallo.fechaNacimiento);
-
-      _sexoSeleccionado = gallo.sexo;
-      _estadoSeleccionado = gallo.estado;
-      _fechaNacimientoSeleccionada = gallo.fechaNacimiento;
-      _rutaFotoTemporal = gallo.fotoPath;
+      _cargarDatosExistentes(widget.galloEditar!);
     } else {
-      // Valores por defecto para creación
-      _sexoSeleccionado = 'Macho';
-      _estadoSeleccionado = 'Activo';
+      _valoresPorDefecto();
     }
+  }
+
+  void _cargarDatosExistentes(Gallo g) {
+    _esEdicion = true;
+    _ctrlPlaca.text = g.placa;
+    _ctrlNombre.text = g.nombre;
+    _ctrlLinea.text = g.lineaGenetica;
+    _ctrlColor.text = g.colorPluma;
+    _ctrlFase.text = g.faseLunar;
+    _ctrlFecha.text = _formatearFecha(g.fechaNacimiento);
+    
+    _ctrlPesoActual.text = g.pesoActual?.toString() ?? '';
+    _ctrlPesoCombate.text = g.pesoCombate?.toString() ?? '';
+    _ctrlJaula.text = g.jaula ?? '';
+    _ctrlCriadero.text = g.criaderoOrigen;
+
+    _ctrlNombrePadre.text = g.nombrePadre ?? '';
+    _ctrlNombreMadre.text = g.nombreMadre ?? '';
+    _ctrlAbueloPaterno.text = g.nombreAbueloPaterno ?? '';
+    _ctrlAbuelaPaterna.text = g.nombreAbuelaPaterna ?? '';
+    _ctrlAbueloMaterno.text = g.nombreAbueloMaterno ?? '';
+    _ctrlAbuelaMaterna.text = g.nombreAbuelaMaterna ?? '';
+
+    // CARGAR PRECIOS
+    final currencyFormat = NumberFormat.currency(locale: 'es_CO', symbol: '', decimalDigits: 0);
+    if (g.costoAdquisicion != null) {
+      _ctrlCosto.text = currencyFormat.format(g.costoAdquisicion).trim();
+    }
+    if (g.precioVenta != null) {
+      _ctrlVenta.text = currencyFormat.format(g.precioVenta).trim();
+    }
+
+    _ctrlVideo.text = g.videoUrl ?? '';
+    _ctrlNotas.text = g.notas ?? '';
+
+    _listaVacunas = List.from(g.vacunas);
+    _listaPeleas = List.from(g.peleas);
+
+    _sexo = g.sexo;
+    _estado = g.estado;
+    _etapaVida = g.etapaVida;
+    _tipoCresta = g.tipoCresta;
+    _fechaNacimiento = g.fechaNacimiento;
+    _padreId = g.padreId;
+    _madreId = g.madreId;
+    _fotoActualBase64 = g.fotoPath;
+  }
+
+  void _valoresPorDefecto() {
+    _sexo = 'Macho';
+    _estado = 'Activo';
+    _etapaVida = 'Cría';
+    _tipoCresta = 'Sierra';
   }
 
   @override
   void dispose() {
-    // Limpiar controladores
-    _controladorPlaca.dispose();
-    _controladorNombre.dispose();
-    _controladorLineaGenetica.dispose();
-    _controladorColorPluma.dispose();
-    _controladorFaseLunar.dispose();
-    _controladorNotas.dispose();
-    _controladorFechaNacimiento.dispose();
+    _tabController.dispose();
+    _ctrlPlaca.dispose(); _ctrlNombre.dispose(); _ctrlLinea.dispose();
+    _ctrlColor.dispose(); _ctrlFase.dispose(); _ctrlFecha.dispose();
+    _ctrlPesoActual.dispose(); _ctrlPesoCombate.dispose();
+    _ctrlJaula.dispose(); _ctrlCriadero.dispose();
+    _ctrlNombrePadre.dispose(); _ctrlNombreMadre.dispose();
+    _ctrlAbueloPaterno.dispose(); _ctrlAbuelaPaterna.dispose();
+    _ctrlAbueloMaterno.dispose(); _ctrlAbuelaMaterna.dispose();
+    _ctrlCosto.dispose(); _ctrlVenta.dispose(); _ctrlVideo.dispose(); _ctrlNotas.dispose();
+    _ctrlNuevaVacuna.dispose(); _ctrlNuevaPelea.dispose();
     super.dispose();
   }
 
-  /// Formatea una fecha al formato DD/MM/YYYY
-  String _formatearFecha(DateTime fecha) {
-    return '${fecha.day.toString().padLeft(2, '0')}/'
-        '${fecha.month.toString().padLeft(2, '0')}/'
-        '${fecha.year}';
-  }
+  String _formatearFecha(DateTime fecha) => '${fecha.day}/${fecha.month}/${fecha.year}';
 
-  /// Abre el selector de imágenes para seleccionar la fotografía del gallo
-  ///
-  /// Utiliza la galería del dispositivo para permitir al usuario
-  /// seleccionar una imagen. La ruta se guarda en [_rutaFotoTemporal]
-  ///
-  /// NOTA IMPORTANTE - Configuración de Permisos:
-  /// - **Android:** Agregar permisos a AndroidManifest.xml:
-  ///   ```xml
-  ///   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-  ///   <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-  ///   ```
-  /// - **iOS:** Agregar configuración a Info.plist:
-  ///   ```xml
-  ///   <key>NSPhotoLibraryUsageDescription</key>
-  ///   <string>CastaSoft necesita acceso a tu galería para seleccionar fotos de gallos</string>
-  ///   ```
   Future<void> _seleccionarImagen() async {
-    try {
-      final imagenSeleccionada = await _selectorImagen.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 85,
-      );
-
-      if (imagenSeleccionada != null) {
-        setState(() {
-          _rutaFotoTemporal = imagenSeleccionada.path;
-        });
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al seleccionar imagen: $error'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  /// Copia la imagen seleccionada a un directorio seguro de la aplicación
-  /// y devuelve la ruta permanente donde quedó almacenada.
-  Future<String> _copiarImagenALocal(String rutaTemporal) async {
-    try {
-      final archivoOrigen = File(rutaTemporal);
-
-      // Obtener directorio de soporte de la aplicación (no sincronizado con OneDrive)
-      // Esto evita problemas de permisos en Windows cuando Documentos está en OneDrive
-      final directorioApp = await getApplicationSupportDirectory();
-
-      // Carpeta donde guardaremos las imágenes de gallos
-      final carpetaImagenes = Directory(
-        path.join(directorioApp.path, 'imagenes_gallos'),
-      );
-      if (!await carpetaImagenes.exists()) {
-        await carpetaImagenes.create(recursive: true);
-      }
-
-      // Generar nombre de archivo único conservando la extensión original
-      final extension = path.extension(rutaTemporal);
-      final nombreUnico = '${const Uuid().v4()}$extension';
-
-      final rutaDestino = path.join(carpetaImagenes.path, nombreUnico);
-
-      // Copiar archivo
-      final archivoCopiado = await archivoOrigen.copy(rutaDestino);
-
-      return archivoCopiado.path;
-    } catch (e) {
-      // Si ocurre un error, relanzarlo para que el llamador lo maneje
-      rethrow;
-    }
-  }
-
-  /// Abre el selector de fecha
-  Future<void> _abrirSelectorFecha() async {
-    final fechaSeleccionada = await showDatePicker(
-      context: context,
-      initialDate: _fechaNacimientoSeleccionada ?? DateTime.now(),
-      firstDate: DateTime(1990),
-      lastDate: DateTime.now(),
-      locale: const Locale('es', 'ES'),
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 30, 
+      maxWidth: 800,    
     );
-
-    if (fechaSeleccionada != null) {
-      setState(() {
-        _fechaNacimientoSeleccionada = fechaSeleccionada;
-        _controladorFechaNacimiento.text = _formatearFecha(fechaSeleccionada);
-      });
+    if (image != null) {
+      // Guardamos el XFile directamente sin convertirlo
+      setState(() => _imagenNuevaSeleccionada = image); 
     }
+}
+
+  double? _limpiarNumero(String valor, {bool esDinero = false}) {
+    if (valor.trim().isEmpty) return null;
+    String limpio = valor.trim();
+    if (esDinero) {
+      limpio = limpio.replaceAll('.', '').replaceAll('\$', '').replaceAll(' ', '');
+      limpio = limpio.replaceAll(',', '.');
+    } else {
+      limpio = limpio.replaceAll(',', '.');
+    }
+    return double.tryParse(limpio);
   }
-
-  /// Guarda el formulario (crea o actualiza)
-  Future<void> _guardarFormulario() async {
-    // Validar que la fecha esté seleccionada
-    if (_fechaNacimientoSeleccionada == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor selecciona una fecha de nacimiento'),
-          backgroundColor: Colors.red,
-        ),
-      );
+  
+  Future<void> _guardar() async {
+    if (_fechaNacimiento == null) {
+      _mostrarSnack('Selecciona fecha de nacimiento', Colors.red);
       return;
     }
+    if (!_claveFormulario.currentState!.validate()) return;
 
-    // Validar el formulario
-    if (!_claveFormulario.currentState!.validate()) {
-      return;
-    }
+    setState(() => _estaGuardando = true);
 
     try {
-      final gallosProveedor = context.read<GallosProveedor>();
-
-      // Preparar ruta final de la foto (si aplica)
-      String? rutaFotoFinal = _rutaFotoTemporal;
-      // Si el usuario seleccionó/actualizó la foto y no es la misma ruta
-      if (_rutaFotoTemporal != null &&
-          _rutaFotoTemporal != widget.galloEditar?.fotoPath) {
-        // Copiar la imagen temporal a almacenamiento local de la app
-        try {
-          rutaFotoFinal = await _copiarImagenALocal(_rutaFotoTemporal!);
-        } catch (e) {
-          // Mostrar error y abortar
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error al guardar la imagen: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-          return;
-        }
+      final proveedor = context.read<GallosProveedor>();
+      
+      String? fotoFinalString;
+      if (_imagenNuevaSeleccionada != null) {
+        final bytes = await _imagenNuevaSeleccionada!.readAsBytes();
+        fotoFinalString = 'base64,${base64Encode(bytes)}';
+      } else {
+        fotoFinalString = widget.galloEditar?.fotoPath;
       }
+
+      final gallo = Gallo(
+        id: _esEdicion ? widget.galloEditar!.id : const Uuid().v4(),
+        userId: _esEdicion ? widget.galloEditar!.userId : null,
+        
+        placa: _ctrlPlaca.text.trim(),
+        nombre: _ctrlNombre.text.trim(),
+        sexo: _sexo!,
+        fechaNacimiento: _fechaNacimiento!,
+        lineaGenetica: _ctrlLinea.text.trim(),
+        colorPluma: _ctrlColor.text.trim(),
+        faseLunar: _ctrlFase.text.trim(),
+        tipoCresta: _tipoCresta ?? 'Sierra',
+        estado: _estado!,
+        etapaVida: _etapaVida ?? 'Cría',
+        criaderoOrigen: _ctrlCriadero.text.trim().isEmpty ? 'Propio' : _ctrlCriadero.text.trim(),
+        jaula: _ctrlJaula.text.isEmpty ? null : _ctrlJaula.text.trim(),
+        
+        pesoActual: _limpiarNumero(_ctrlPesoActual.text, esDinero: false),
+        pesoCombate: _limpiarNumero(_ctrlPesoCombate.text, esDinero: false),
+        
+        costoAdquisicion: _limpiarNumero(_ctrlCosto.text, esDinero: true),
+        precioVenta: _limpiarNumero(_ctrlVenta.text, esDinero: true),
+        
+        notas: _ctrlNotas.text.isEmpty ? null : _ctrlNotas.text.trim(),
+        fotoPath: fotoFinalString,
+        videoUrl: _ctrlVideo.text.isEmpty ? null : _ctrlVideo.text.trim(),
+        
+        padreId: _padreId,
+        madreId: _madreId,
+        nombrePadre: _ctrlNombrePadre.text.isEmpty ? null : _ctrlNombrePadre.text,
+        nombreMadre: _ctrlNombreMadre.text.isEmpty ? null : _ctrlNombreMadre.text,
+        nombreAbueloPaterno: _ctrlAbueloPaterno.text.isEmpty ? null : _ctrlAbueloPaterno.text,
+        nombreAbuelaPaterna: _ctrlAbuelaPaterna.text.isEmpty ? null : _ctrlAbuelaPaterna.text,
+        nombreAbueloMaterno: _ctrlAbueloMaterno.text.isEmpty ? null : _ctrlAbueloMaterno.text,
+        nombreAbuelaMaterna: _ctrlAbuelaMaterna.text.isEmpty ? null : _ctrlAbuelaMaterna.text,
+        
+        vacunas: _listaVacunas,
+        peleas: _listaPeleas,
+      );
 
       if (_esEdicion) {
-        // Editar gallo existente
-        final galloEditado = Gallo(
-          id: widget.galloEditar!.id,
-          placa: _controladorPlaca.text.trim(),
-          nombre: _controladorNombre.text.trim(),
-          sexo: _sexoSeleccionado!,
-          fechaNacimiento: _fechaNacimientoSeleccionada!,
-          lineaGenetica: _controladorLineaGenetica.text.trim(),
-          colorPluma: _controladorColorPluma.text.trim(),
-          faseLunar: _controladorFaseLunar.text.trim(),
-          fotoPath: rutaFotoFinal,
-          estado: _estadoSeleccionado!,
-          notas: _controladorNotas.text.trim().isEmpty
-              ? null
-              : _controladorNotas.text.trim(),
-          idPadre: widget.galloEditar!.idPadre,
-          idMadre: widget.galloEditar!.idMadre,
-        );
-
-        try {
-          await gallosProveedor.actualizarGallo(galloEditado);
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(e.toString()),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-          // No cerrar la pantalla para permitir corrección
-          return;
-        }
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Gallo actualizado correctamente'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          Navigator.pop(context);
-        }
+        await proveedor.actualizarGallo(gallo);
+        _mostrarSnack('Gallo actualizado correctamente', Colors.green);
       } else {
-        // Crear nuevo gallo
-        const generadorUUID = Uuid();
-        final nuevoGallo = Gallo(
-          id: generadorUUID.v4(),
-          placa: _controladorPlaca.text.trim(),
-          nombre: _controladorNombre.text.trim(),
-          sexo: _sexoSeleccionado!,
-          fechaNacimiento: _fechaNacimientoSeleccionada!,
-          lineaGenetica: _controladorLineaGenetica.text.trim(),
-          colorPluma: _controladorColorPluma.text.trim(),
-          faseLunar: _controladorFaseLunar.text.trim(),
-          fotoPath: rutaFotoFinal,
-          estado: _estadoSeleccionado!,
-          notas: _controladorNotas.text.trim().isEmpty
-              ? null
-              : _controladorNotas.text.trim(),
-        );
-
-        try {
-          await gallosProveedor.crearGallo(nuevoGallo);
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(e.toString()),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-          // No cerrar la pantalla para permitir corrección
-          return;
-        }
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Gallo creado correctamente'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          Navigator.pop(context);
-        }
+        await proveedor.crearGallo(gallo);
+        _mostrarSnack('Gallo creado correctamente', Colors.green);
       }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $error'), backgroundColor: Colors.red),
-        );
-      }
+      
+      if (mounted) Navigator.pop(context);
+
+    } catch (e) {
+      _mostrarSnack('Error: $e', Colors.red);
+    } finally {
+      if (mounted) setState(() => _estaGuardando = false);
     }
+  }
+
+  void _mostrarSnack(String msj, Color color) {
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msj), backgroundColor: color));
   }
 
   @override
   Widget build(BuildContext context) {
-    final esDesktop = MediaQuery.of(context).size.width > 800;
-
     return Scaffold(
-      /// AppBar con título dinámico
       appBar: AppBar(
-        title: Text(
-          _esEdicion ? 'Editar ${widget.galloEditar!.nombre}' : 'Nuevo Gallo',
-        ),
+        title: Text(_esEdicion ? 'Editar Gallo' : 'Nuevo Gallo'),
         backgroundColor: const Color(0xFF1E3A8A),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: const Color(0xFFD4AF37),
+          indicatorWeight: 4,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white60,
+          isScrollable: true,
+          tabs: const [
+            Tab(icon: FaIcon(FontAwesomeIcons.kiwiBird), text: 'Datos'),
+            Tab(icon: FaIcon(FontAwesomeIcons.sitemap), text: 'Genealogía'),
+            Tab(icon: FaIcon(FontAwesomeIcons.heartPulse), text: 'Gestión'),
+            Tab(icon: FaIcon(FontAwesomeIcons.sackDollar), text: 'Finanzas'),
+          ],
+        ),
       ),
-
-      /// Cuerpo del formulario
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(32),
-        child: Form(
-          key: _claveFormulario,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              /// ==================== SECCIÓN 0: FOTO (ENCABEZADO) ====================
-              Center(
-                child: Column(
-                  children: [
-                    GestureDetector(
-                      onTap: _seleccionarImagen,
-                      child: Container(
-                        width: 180,
-                        height: 180,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: const Color(0xFFE2E8F0),
-                            width: 2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: _rutaFotoTemporal != null
-                            ? Stack(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(14),
-                                    child: Image.file(
-                                      File(_rutaFotoTemporal!),
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                      height: double.infinity,
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 8,
-                                    right: 8,
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFD4AF37),
-                                        borderRadius: BorderRadius.circular(8),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(
-                                              0.2,
-                                            ),
-                                            blurRadius: 6,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      padding: const EdgeInsets.all(8),
-                                      child: const Icon(
-                                        FontAwesomeIcons.edit,
-                                        color: Colors.white,
-                                        size: 18,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    FontAwesomeIcons.camera,
-                                    size: 48,
-                                    color: const Color(0xFF1E3A8A),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    'Agregar Foto',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: const Color(0xFF1E3A8A),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Toca la imagen para cambiarla',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: const Color(0xFF94A3B8),
-                      ),
-                    ),
-                  ],
-                ),
+      body: _estaGuardando 
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFD4AF37)))
+          : Form(
+              key: _claveFormulario,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildTabDatos(),      
+                  _buildTabGenealogia(), 
+                  _buildTabGestion(),    
+                  _buildTabFinanzas(),   
+                ],
               ),
-              const SizedBox(height: 40),
+            ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _estaGuardando ? null : _guardar,
+        backgroundColor: const Color(0xFFD4AF37),
+        icon: const Icon(Icons.save),
+        label: const Text('GUARDAR'),
+      ),
+    );
+  }
 
-              /// ==================== TARJETA 1: IDENTIFICACIÓN ====================
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Identificación',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF1E3A8A),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _controladorPlaca,
-                              decoration: _construirDecoracionCampo(
-                                'Placa (Anillo)',
-                              ),
-                              validator: (valor) {
-                                if (valor == null || valor.trim().isEmpty) {
-                                  return 'La placa es obligatoria';
-                                }
+  Widget _buildFotoPicker() {
+    ImageProvider? imagenMostrar;
+    if (_imagenNuevaSeleccionada != null) {
+      // 🔥 EL TRUCO SE MANTIENE
+      imagenMostrar = kIsWeb 
+          ? NetworkImage(_imagenNuevaSeleccionada!.path) as ImageProvider 
+          // Reconstruimos el File solo para el renderizado nativo
+          : FileImage(File(_imagenNuevaSeleccionada!.path)); 
+    } else if (_fotoActualBase64 != null && _fotoActualBase64!.startsWith('base64,')) {
+      try {
+        final String base64String = _fotoActualBase64!.split(',').last;
+        imagenMostrar = MemoryImage(base64Decode(base64String));
+      } catch (e) { print('Error imagen: $e'); }
+    }
 
-                                final gallosProveedor = context
-                                    .read<GallosProveedor>();
-                                final placaTrimmed = valor.trim();
-
-                                if (_esEdicion &&
-                                    widget.galloEditar!.placa == placaTrimmed) {
-                                  return null;
-                                }
-
-                                if (gallosProveedor.validarPlacaDuplicada(
-                                  placaTrimmed,
-                                )) {
-                                  return 'Esta placa ya está registrada';
-                                }
-
-                                return null;
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _controladorNombre,
-                              decoration: _construirDecoracionCampo('Nombre'),
-                              validator: (valor) {
-                                if (valor == null || valor.trim().isEmpty) {
-                                  return 'El nombre es obligatorio';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              /// ==================== TARJETA 2: CARACTERÍSTICAS ====================
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Características',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF1E3A8A),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: _sexoSeleccionado,
-                              decoration: _construirDecoracionCampo('Sexo'),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'Macho',
-                                  child: Text('Macho'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Hembra',
-                                  child: Text('Hembra'),
-                                ),
-                              ],
-                              onChanged: (valor) {
-                                setState(() {
-                                  _sexoSeleccionado = valor;
-                                });
-                              },
-                              validator: (valor) {
-                                if (valor == null) {
-                                  return 'Selecciona sexo';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _controladorColorPluma,
-                              decoration: _construirDecoracionCampo(
-                                'Color de Pluma',
-                              ),
-                              validator: (valor) {
-                                if (valor == null || valor.trim().isEmpty) {
-                                  return 'Ingresa el color';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: _estadoSeleccionado,
-                              decoration: _construirDecoracionCampo('Estado'),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'Activo',
-                                  child: Text('Activo'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Vendido',
-                                  child: Text('Vendido'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'Retirado',
-                                  child: Text('Retirado'),
-                                ),
-                              ],
-                              onChanged: (valor) {
-                                setState(() {
-                                  _estadoSeleccionado = valor;
-                                });
-                              },
-                              validator: (valor) {
-                                if (valor == null) {
-                                  return 'Selecciona estado';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      TextFormField(
-                        controller: _controladorLineaGenetica,
-                        decoration: _construirDecoracionCampo(
-                          'Línea Genética (Ej: Kelso, Sweater)',
-                        ),
-                        validator: (valor) {
-                          if (valor == null || valor.trim().isEmpty) {
-                            return 'La línea genética es obligatoria';
-                          }
-                          return null;
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              /// ==================== TARJETA 3: ORIGEN ====================
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Origen',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF1E3A8A),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _controladorFechaNacimiento,
-                              decoration: _construirDecoracionCampo(
-                                'Fecha de Nacimiento',
-                                sufijo: GestureDetector(
-                                  onTap: _abrirSelectorFecha,
-                                  child: const Icon(Icons.calendar_today),
-                                ),
-                              ),
-                              readOnly: true,
-                              validator: (valor) {
-                                if (_fechaNacimientoSeleccionada == null) {
-                                  return 'Selecciona fecha';
-                                }
-                                return null;
-                              },
-                              onTap: _abrirSelectorFecha,
-                            ),
-                          ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _controladorFaseLunar,
-                              decoration: _construirDecoracionCampo(
-                                'Fase Lunar (Ej: Luna Nueva)',
-                              ),
-                              validator: (valor) {
-                                if (valor == null || valor.trim().isEmpty) {
-                                  return 'La fase lunar es obligatoria';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              /// ==================== CAMPO DE NOTAS ====================
-              TextFormField(
-                controller: _controladorNotas,
-                decoration: _construirDecoracionCampo('Notas (Opcional)'),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 32),
-
-              /// ==================== BOTÓN GUARDAR ====================
-              ElevatedButton(
-                onPressed: _guardarFormulario,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD4AF37),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 4,
-                ),
-                child: Text(
-                  _esEdicion ? 'Actualizar Gallo' : 'Crear Gallo',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
+    return Center(
+      child: GestureDetector(
+        onTap: _seleccionarImagen,
+        child: Container(
+          width: 150, height: 150,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: Colors.grey.shade300),
+            image: imagenMostrar != null 
+                ? DecorationImage(image: imagenMostrar, fit: BoxFit.cover) 
+                : null,
           ),
+          child: imagenMostrar == null 
+              ? const Icon(Icons.add_a_photo, size: 50, color: Color(0xFF1E3A8A)) 
+              : null,
         ),
       ),
     );
   }
 
-  /// Construye la decoración para los campos de texto
-  InputDecoration _construirDecoracionCampo(String etiqueta, {Widget? sufijo}) {
+  Widget _buildResponsiveDualInput(Widget input1, Widget input2) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 350) { 
+          return Column(
+            children: [
+              input1,
+              const SizedBox(height: 15),
+              input2,
+            ],
+          );
+        } else {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: input1),
+              const SizedBox(width: 15),
+              Expanded(child: input2),
+            ],
+          );
+        }
+      },
+    );
+  }
+
+  // PESTAÑA 1
+  Widget _buildTabDatos() {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        _buildFotoPicker(),
+        const SizedBox(height: 20),
+        _buildCard('Identificación', [
+          _buildResponsiveDualInput(
+            _buildInput(_ctrlPlaca, 'Placa / Anillo', icon: FontAwesomeIcons.tag, validacion: true),
+            _buildInput(_ctrlNombre, 'Nombre', icon: FontAwesomeIcons.signature, validacion: true)
+          ),
+          const SizedBox(height: 15),
+          _buildResponsiveDualInput(
+            _buildDropdown('Sexo', ['Macho', 'Hembra'], _sexo, (v) => setState(() => _sexo = v)),
+            _buildInput(_ctrlFecha, 'Fec. Nacimiento', icon: FontAwesomeIcons.calendar, readOnly: true, onTap: _seleccionarFecha)
+          ),
+        ]),
+        const SizedBox(height: 15),
+        _buildCard('Genética y Físico', [
+          _buildResponsiveDualInput(
+            _buildInput(_ctrlLinea, 'Línea Genética', icon: FontAwesomeIcons.dna, validacion: true),
+            _buildInput(_ctrlColor, 'Color Pluma', icon: FontAwesomeIcons.palette, validacion: true)
+          ),
+          const SizedBox(height: 15),
+          _buildResponsiveDualInput(
+            _buildDropdown('Cresta', ['Sierra', 'Rosa', 'Pava', 'Boton', 'Simple'], _tipoCresta, (v) => setState(() => _tipoCresta = v)),
+            _buildInput(_ctrlFase, 'Fase Lunar', icon: FontAwesomeIcons.moon, validacion: true)
+          ),
+        ]),
+        const SizedBox(height: 60), 
+      ],
+    );
+  }
+
+  // PESTAÑA 2
+  Widget _buildTabGenealogia() {
+    final gallos = context.watch<GallosProveedor>().gallos; 
+    final padres = gallos.where((g) => g.sexo == 'Macho' && g.id != widget.galloEditar?.id).toList();
+    final madres = gallos.where((g) => g.sexo == 'Hembra' && g.id != widget.galloEditar?.id).toList();
+
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        _buildCard('Padres en el Sistema', [
+          DropdownButtonFormField<String>(
+            isExpanded: true,
+            value: _padreId,
+            items: padres.map((g) => DropdownMenuItem(value: g.id, child: Text('${g.nombre} (${g.placa})', overflow: TextOverflow.ellipsis))).toList(),
+            onChanged: (v) {
+              setState(() {
+                _padreId = v;
+                // 🔥 MAGIA: Auto-llenado en cascada para la rama paterna
+                if (v != null) {
+                  final padreSeleccionado = padres.firstWhere((g) => g.id == v);
+                  _ctrlNombrePadre.text = padreSeleccionado.nombre;
+                  _ctrlAbueloPaterno.text = padreSeleccionado.nombrePadre ?? '';
+                  _ctrlAbuelaPaterna.text = padreSeleccionado.nombreMadre ?? '';
+                }
+              });
+            },
+            decoration: _inputDeco('Padre (Macho)'),
+          ),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            isExpanded: true,
+            value: _madreId,
+            items: madres.map((g) => DropdownMenuItem(value: g.id, child: Text('${g.nombre} (${g.placa})', overflow: TextOverflow.ellipsis))).toList(),
+            onChanged: (v) {
+              setState(() {
+                _madreId = v;
+                // 🔥 MAGIA: Auto-llenado en cascada para la rama materna
+                if (v != null) {
+                  final madreSeleccionada = madres.firstWhere((g) => g.id == v);
+                  _ctrlNombreMadre.text = madreSeleccionada.nombre;
+                  _ctrlAbueloMaterno.text = madreSeleccionada.nombrePadre ?? '';
+                  _ctrlAbuelaMaterna.text = madreSeleccionada.nombreMadre ?? '';
+                }
+              });
+            },
+            decoration: _inputDeco('Madre (Hembra)'),
+          ),
+        ]),
+        const SizedBox(height: 20),
+        _buildCard('Árbol Genealógico Texto', [
+          _buildInput(_ctrlNombrePadre, 'Nombre del Padre'),
+          const SizedBox(height: 10),
+          _buildResponsiveDualInput(
+            _buildInput(_ctrlAbueloPaterno, 'Abuelo Paterno'),
+            _buildInput(_ctrlAbuelaPaterna, 'Abuela Paterna')
+          ),
+          const Divider(height: 20),
+          _buildInput(_ctrlNombreMadre, 'Nombre de la Madre'),
+          const SizedBox(height: 10),
+          _buildResponsiveDualInput(
+            _buildInput(_ctrlAbueloMaterno, 'Abuelo Materno'),
+            _buildInput(_ctrlAbuelaMaterna, 'Abuela Materna')
+          ),
+        ]),
+        const SizedBox(height: 60),
+      ],
+    );
+  }
+
+  // PESTAÑA 3
+  Widget _buildTabGestion() {
+    // 🔥 Truco Anti-Crash: Lista nueva, pero agregamos la vieja temporalmente si la tiene
+    List<String> etapasFormulario = ['Cría', 'Pollos crestones', 'Pollonas', 'Muda', 'Postura', 'Padrote', 'Madrilla', 'Combate'];
+    if (_etapaVida != null && !etapasFormulario.contains(_etapaVida)) {
+      etapasFormulario.add(_etapaVida!); 
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        _buildCard('Estado Actual', [
+          _buildResponsiveDualInput(
+            _buildDropdown('Estado', ['Activo', 'Vendido', 'Baja', 'Retirado'], _estado, (v) => setState(() => _estado = v)),
+            // Pasamos la lista dinámica en vez de la estática
+            _buildDropdown('Etapa', etapasFormulario, _etapaVida, (v) => setState(() => _etapaVida = v))
+          ),
+          const SizedBox(height: 15),
+          _buildResponsiveDualInput(
+            _buildInput(_ctrlPesoActual, 'Peso Actual (Lbs)', isNumber: true, icon: FontAwesomeIcons.weightScale),
+            _buildInput(_ctrlPesoCombate, 'Peso Pactado (Lbs)', isNumber: true, icon: FontAwesomeIcons.dumbbell)
+          ),
+          const SizedBox(height: 15),
+          _buildInput(_ctrlJaula, 'Jaula / Ubicación'),
+        ]),
+        const SizedBox(height: 20),
+        _buildCard('Vacunas', [
+          _buildListaDinamica(_ctrlNuevaVacuna, _listaVacunas, 'Agregar Vacuna'),
+        ]),
+        const SizedBox(height: 20),
+        _buildCard('Peleas', [
+          _buildListaDinamica(_ctrlNuevaPelea, _listaPeleas, 'Agregar Pelea'),
+        ]),
+        const SizedBox(height: 60),
+      ],
+    );
+  }
+
+  // PESTAÑA 4
+  Widget _buildTabFinanzas() {
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        _buildCard('Rentabilidad', [
+          _buildResponsiveDualInput(
+            _buildInput(_ctrlCosto, 'Costo Adquisición', isNumber: true, isMoney: true, icon: Icons.money_off),
+            _buildInput(_ctrlVenta, 'Precio Venta', isNumber: true, isMoney: true, icon: Icons.attach_money)
+          ),
+          const SizedBox(height: 15),
+          _buildInput(_ctrlCriadero, 'Criadero de Origen'),
+        ]),
+        const SizedBox(height: 20),
+        _buildCard('Multimedia y Notas', [
+          // 🔥 CAMBIO: Etiqueta general para cualquier enlace
+          _buildInput(_ctrlVideo, 'Enlace (YouTube, Drive, Telegram)', icon: FontAwesomeIcons.link),
+          const SizedBox(height: 15),
+          _buildInput(_ctrlNotas, 'Notas', maxLines: 3),
+        ]),
+        const SizedBox(height: 60),
+      ],
+    );
+  }
+
+  Widget _buildCard(String title, List<Widget> children) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A))),
+          const Divider(),
+          const SizedBox(height: 10),
+          ...children,
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildInput(
+    TextEditingController ctrl, 
+    String label, {
+      dynamic icon, 
+      bool isNumber = false, 
+      bool isMoney = false, 
+      bool validacion = false, 
+      int maxLines = 1, 
+      bool readOnly = false, 
+      VoidCallback? onTap
+    }) {
+    return TextFormField(
+      controller: ctrl,
+      keyboardType: isNumber 
+          ? const TextInputType.numberWithOptions(decimal: true) 
+          : TextInputType.text,
+      readOnly: readOnly,
+      onTap: onTap,
+      maxLines: maxLines,
+      inputFormatters: isMoney 
+          ? [FilteringTextInputFormatter.digitsOnly, CurrencyInputFormatter()] 
+          : null,
+      decoration: _inputDeco(label, icon: icon),
+      validator: validacion ? (v) => (v == null || v.isEmpty) ? 'Requerido' : null : null,
+    );
+  }
+
+  InputDecoration _inputDeco(String label, {dynamic icon}) {
     return InputDecoration(
-      labelText: etiqueta,
+      labelText: label,
+      labelStyle: const TextStyle(fontSize: 13),
+      prefixIcon: icon != null 
+          ? (icon is IconData 
+              ? Icon(icon, size: 18, color: const Color(0xFF1E3A8A)) 
+              : FaIcon(icon, size: 18, color: const Color(0xFF1E3A8A))) 
+          : null,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFF1E3A8A), width: 2),
-      ),
-      labelStyle: GoogleFonts.poppins(
-        fontSize: 14,
-        color: const Color(0xFF64748B),
-      ),
-      suffixIcon: sufijo,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+    );
+}
+  Widget _buildDropdown(String label, List<String> items, String? valor, Function(String?) onChanged) {
+    return DropdownButtonFormField<String>(
+      isExpanded: true,
+      initialValue: valor,
+      decoration: _inputDeco(label),
+      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 14)))).toList(),
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _buildListaDinamica(TextEditingController ctrl, List<String> lista, String hint) {
+    return Column(
+      children: [
+        Row(children: [
+          Expanded(child: TextFormField(controller: ctrl, decoration: _inputDeco(hint))),
+          IconButton(
+            icon: const Icon(Icons.add_circle, color: Color(0xFF1E3A8A)),
+            onPressed: () {
+              if (ctrl.text.isNotEmpty) {
+                setState(() => lista.add(ctrl.text));
+                ctrl.clear();
+              }
+            },
+          )
+        ]),
+        Wrap(
+          spacing: 8,
+          children: lista.map((e) => Chip(
+            label: Text(e),
+            deleteIcon: const Icon(Icons.close, size: 16),
+            onDeleted: () => setState(() => lista.remove(e)),
+          )).toList(),
+        )
+      ],
+    );
+  }
+
+  Future<void> _seleccionarFecha() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _fechaNacimiento ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        _fechaNacimiento = picked;
+        _ctrlFecha.text = _formatearFecha(picked);
+      });
+    }
+  }
+}
+
+class CurrencyInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.selection.baseOffset == 0) {
+      return newValue;
+    }
+
+    double value = double.parse(newValue.text);
+    final formatter = NumberFormat.currency(locale: 'es_CO', symbol: '', decimalDigits: 0);
+    String newText = formatter.format(value).trim();
+
+    return newValue.copyWith(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newText.length),
     );
   }
 }

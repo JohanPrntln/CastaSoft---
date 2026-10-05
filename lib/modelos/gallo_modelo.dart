@@ -1,97 +1,67 @@
-/// Clase modelo para la entidad Gallo
-///
-/// Representa un gallo en la aplicación CastaSoft con todas sus características
-/// genéticas, físicas y administrativas.
-///
-/// Propiedades principales:
-/// - Identificación única (id, placa)
-/// - Datos personales (nombre, sexo, fecha de nacimiento)
-/// - Genealogía (padre, madre, línea genética)
-/// - Características físicas (color de pluma)
-/// - Información adicional (fase lunar, estado, notas)
-///
-/// Métodos para persistencia en base de datos:
-/// - toMap(): Serializa el objeto a formato compatible con SQLite
-/// - fromMap(): Deserializa desde un mapa de base de datos
+/// MODELO MAESTRO - CASTASOFT
+/// Contiene: Identificación + Genealogía Expandida + Salud + Finanzas + Multimedia
 class Gallo {
-  /// Identificador único del gallo (UUID o timestamp único)
-  /// Requerido para identificación interna en la base de datos
+  // ==================== 1. IDENTIFICACIÓN ====================
   final String id;
-
-  /// Número de anillo o placa de identificación
-  /// Identificador visual del gallo
-  final String placa;
-
-  /// Nombre del gallo
-  /// Identificador amigable para el usuario
+  final String? userId; // Dueño del gallo (Seguridad Nube)
+  final String placa;   // Anillo único
   final String nombre;
-
-  /// Sexo del gallo
-  /// Valores permitidos: 'Macho' o 'Hembra'
-  final String sexo;
-
-  /// Fecha de nacimiento del gallo
-  /// Se utiliza para calcular la edad
+  final String sexo;    // 'Macho', 'Hembra'
+  final String criaderoOrigen; // De dónde vino
+  
+  // ==================== 2. BIOLOGÍA Y FÍSICO ====================
   final DateTime fechaNacimiento;
-
-  /// Identificador del padre del gallo
-  /// Opcional para mantener registro genealógico
-  /// Permite null si se desconoce o no existe registro
-  final String? idPadre;
-
-  /// Identificador de la madre del gallo
-  /// Opcional para mantener registro genealógico
-  /// Permite null si se desconoce o no existe registro
-  final String? idMadre;
-
-  /// Línea genética del gallo
-  /// Ejemplos: 'Kelso', 'Sweater', 'Blueface', 'Hatch'
-  /// Determina la raza o línea de reproducción
-  final String lineaGenetica;
-
-  /// Color de las plumas del gallo
-  /// Ejemplos: 'Rojo', 'Negro', 'Colorín', 'Dorado'
-  /// Importante para identificación visual
+  final String lineaGenetica; // Ej: Kelso, Sweater, Radio
   final String colorPluma;
+  final String faseLunar;     // Dato tradicional
+  final String tipoCresta;    // Ej: Sierra, Rosa, Pava
+  final double? pesoActual;   // Peso al día de hoy
+  final double? pesoCombate;  // Peso ideal para pelear
+  final String? jaula;        // Ubicación física
 
-  /// Fase lunar en la que nació el gallo
-  /// Dato astrológico utilizado en algunas tradiciones de crianza
-  /// Ejemplos: 'Luna Nueva', 'Cuarto Creciente', 'Luna Llena', 'Cuarto Menguante'
-  final String faseLunar;
+  // ==================== 3. ESTADO Y GESTIÓN ====================
+  /// Estado general: 'Activo', 'Vendido', 'Baja', 'Retirado'
+  final String estado; 
+  
+  /// [RECOMENDACIÓN] Etapa detallada: 'Cría', 'Levante', 'Muda', 'Postura/Cuido', 'Padrote'
+  final String etapaVida; 
 
-  /// Ruta local de la fotografía del gallo
-  /// Opcional - permite null si no hay foto
-  /// Se almacena la ruta local para cargar la imagen en la aplicación
-  final String? fotoPath;
+  // ==================== 4. GENEALOGÍA VISUAL (ÁRBOL COMPLETO) ====================
+  // IDs para vincular con gallos que SÍ tienen ficha en la app
+  final String? padreId;
+  final String? madreId;
+  
+  // [PEDIDO CLIENTE] Texto libre para imprimir en PDF aunque el ancestro no tenga ficha
+  final String? nombrePadre; 
+  final String? nombreMadre;
+  final String? nombreAbueloPaterno;
+  final String? nombreAbuelaPaterna;
+  final String? nombreAbueloMaterno;
+  final String? nombreAbuelaMaterna;
 
-  /// Estado actual del gallo
-  /// Valores permitidos: 'Activo', 'Vendido', 'Baja'
-  /// Determina si el gallo sigue activo en el sistema
-  final String estado;
+  // ==================== 5. HISTORIAL Y SALUD (LISTAS) ====================
+  // [PEDIDO CLIENTE] Listas para ir agregando eventos uno tras otro
+  final List<String> vacunas; // Ej: ["Newcastle - Enero 2024", "Coriza - Feb 2024"]
+  final List<String> peleas;  // Ej: ["Ganó a Giro en 12min", "Entabló en Club X"]
+  final String? notas;        // Observaciones generales
 
-  /// Notas o comentarios adicionales sobre el gallo
-  /// Campo opcional para información adicional
-  /// Permite null si no hay notas
-  final String? notas;
+  // ==================== 6. MULTIMEDIA Y EXTRAS ====================
+  final String? fotoPath; // Ruta de la imagen principal
+  
+  /// [RECOMENDACIÓN] Link a video de YouTube/Drive para ver al gallo peleando/caminando
+  final String? videoUrl; 
 
-  /// Constructor de la clase Gallo
-  ///
-  /// Parámetros:
-  /// - [id] - Identificador único (obligatorio)
-  /// - [placa] - Número de anillo (obligatorio)
-  /// - [nombre] - Nombre del gallo (obligatorio)
-  /// - [sexo] - Sexo del gallo (obligatorio)
-  /// - [fechaNacimiento] - Fecha de nacimiento (obligatorio)
-  /// - [lineaGenetica] - Línea genética (obligatorio)
-  /// - [colorPluma] - Color de pluma (obligatorio)
-  /// - [faseLunar] - Fase lunar de nacimiento (obligatorio)
-  /// - [estado] - Estado del gallo (obligatorio)
-  /// - [idPadre] - ID del padre (opcional)
-  /// - [idMadre] - ID de la madre (opcional)
-  /// - [fotoPath] - Ruta de la foto (opcional)
-  /// - [notas] - Notas adicionales (opcional)
+  // ==================== 7. FINANZAS (RENTABILIDAD) ====================
+  /// [RECOMENDACIÓN] Cuánto costó adquirirlo o criarlo
+  final double? costoAdquisicion;
+  /// [RECOMENDACIÓN] En cuánto se vendió (si estado == 'Vendido')
+  final double? precioVenta;
+
+
+  // === CONSTRUCTOR MAESTRO ===
   const Gallo({
     required this.id,
+    this.userId,
     required this.placa,
     required this.nombre,
     required this.sexo,
@@ -100,88 +70,138 @@ class Gallo {
     required this.colorPluma,
     required this.faseLunar,
     required this.estado,
-    this.idPadre,
-    this.idMadre,
-    this.fotoPath,
+    this.etapaVida = 'Cría', // Valor por defecto sugerido
+    this.tipoCresta = 'Sierra',
+    this.criaderoOrigen = 'Propio',
+    this.jaula,
+    this.pesoActual,
+    this.pesoCombate,
     this.notas,
-  });
+    this.fotoPath,
+    this.videoUrl,
+    this.costoAdquisicion,
+    this.precioVenta,
+    // Genealogía
+    this.padreId,
+    this.madreId,
+    this.nombrePadre,
+    this.nombreMadre,
+    this.nombreAbueloPaterno,
+    this.nombreAbuelaPaterna,
+    this.nombreAbueloMaterno,
+    this.nombreAbuelaMaterna,
+    // Listas (Inician vacías si no se pasan datos)
+    this.vacunas = const [],
+    this.peleas = const [],
+    // Compatibilidad vieja (si existe código viejo llamando esto)
+    String? idPadre,
+    String? idMadre,
+  }); 
 
-  /// Convierte el objeto Gallo a un mapa para almacenamiento en SQLite
-  ///
-  /// Este método serializa todos los campos del gallo a un formato
-  /// compatible con la base de datos SQLite.
-  ///
-  /// Retorna: [Map<String, dynamic>] con todos los datos del gallo
-  ///
-  /// Notas:
-  /// - La fecha se convierte a formato ISO 8601 (String)
-  /// - Los campos opcionales se incluyen con su valor actual (null si aplica)
+  // Compatibilidad Getters
+  String? get idPadre => padreId;
+  String? get idMadre => madreId;
+
+  // === MAPEO PARA FIREBASE (SERIALIZACIÓN) ===
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'userId': userId,
       'placa': placa,
       'nombre': nombre,
       'sexo': sexo,
       'fechaNacimiento': fechaNacimiento.toIso8601String(),
-      'idPadre': idPadre,
-      'idMadre': idMadre,
       'lineaGenetica': lineaGenetica,
       'colorPluma': colorPluma,
       'faseLunar': faseLunar,
-      'fotoPath': fotoPath,
+      'tipoCresta': tipoCresta,
       'estado': estado,
+      'etapaVida': etapaVida, // Nuevo campo
+      'criaderoOrigen': criaderoOrigen,
+      'jaula': jaula,
+      'pesoActual': pesoActual,
+      'pesoCombate': pesoCombate,
       'notas': notas,
+      'fotoPath': fotoPath,
+      'videoUrl': videoUrl,   // Nuevo campo
+      'costoAdquisicion': costoAdquisicion, // Nuevo campo
+      'precioVenta': precioVenta,           // Nuevo campo
+      // Genealogía Completa
+      'padreId': padreId,
+      'madreId': madreId,
+      'nombrePadre': nombrePadre,
+      'nombreMadre': nombreMadre,
+      'nombreAbueloPaterno': nombreAbueloPaterno,
+      'nombreAbuelaPaterna': nombreAbuelaPaterna,
+      'nombreAbueloMaterno': nombreAbueloMaterno,
+      'nombreAbuelaMaterna': nombreAbuelaMaterna,
+      // Listas
+      'vacunas': vacunas,
+      'peleas': peleas,
     };
   }
 
-  /// Crea un objeto Gallo a partir de un mapa de base de datos
-  ///
-  /// Factory constructor que deserializa los datos de SQLite
-  /// hacia un objeto Gallo válido.
-  ///
-  /// Parámetro: [mapa] - Mapa con datos del gallo desde la base de datos
-  ///
-  /// Retorna: Una nueva instancia de [Gallo] con los datos del mapa
-  ///
-  /// Notas:
-  /// - La fecha se convierte de formato ISO 8601 (String) a DateTime
-  /// - Se asume que todos los campos obligatorios están presentes
-  /// - Los campos opcionales pueden ser null
-  factory Gallo.fromMap(Map<String, dynamic> mapa) {
+  // === DESDE FIREBASE A OBJETO (VERSIÓN BLINDADA) ===
+  factory Gallo.fromMap(Map<String, dynamic> map) {
+    // Funciones de ayuda para evitar errores de conversión
+    double? toDouble(dynamic val) {
+      if (val == null) return null;
+      if (val is int) return val.toDouble(); // Convierte 2500 a 2500.0
+      if (val is double) return val;
+      if (val is String) return double.tryParse(val); // Intenta leer "2500" como número
+      return null;
+    }
+
+    List<String> toListString(dynamic val) {
+      if (val == null) return [];
+      if (val is List) {
+        // Convierte cada elemento a String a la fuerza para que no falle
+        return val.map((e) => e.toString()).toList();
+      }
+      return [];
+    }
+
     return Gallo(
-      id: mapa['id'] as String,
-      placa: mapa['placa'] as String,
-      nombre: mapa['nombre'] as String,
-      sexo: mapa['sexo'] as String,
-      fechaNacimiento: DateTime.parse(mapa['fechaNacimiento'] as String),
-      idPadre: mapa['idPadre'] as String?,
-      idMadre: mapa['idMadre'] as String?,
-      lineaGenetica: mapa['lineaGenetica'] as String,
-      colorPluma: mapa['colorPluma'] as String,
-      faseLunar: mapa['faseLunar'] as String,
-      fotoPath: mapa['fotoPath'] as String?,
-      estado: mapa['estado'] as String,
-      notas: mapa['notas'] as String?,
+      id: map['id']?.toString() ?? '',
+      userId: map['userId']?.toString(),
+      placa: map['placa']?.toString() ?? '',
+      nombre: map['nombre']?.toString() ?? '',
+      sexo: map['sexo']?.toString() ?? 'Macho',
+      fechaNacimiento: map['fechaNacimiento'] != null 
+          ? DateTime.parse(map['fechaNacimiento'].toString()) 
+          : DateTime.now(),
+      lineaGenetica: map['lineaGenetica']?.toString() ?? '',
+      colorPluma: map['colorPluma']?.toString() ?? '',
+      faseLunar: map['faseLunar']?.toString() ?? '',
+      tipoCresta: map['tipoCresta']?.toString() ?? 'Sierra',
+      estado: map['estado']?.toString() ?? 'Activo',
+      etapaVida: map['etapaVida']?.toString() ?? 'Cría',
+      criaderoOrigen: map['criaderoOrigen']?.toString() ?? 'Propio',
+      jaula: map['jaula']?.toString(),
+      
+      // Aquí usamos la función segura toDouble
+      pesoActual: toDouble(map['pesoActual']) ?? toDouble(map['peso']),
+      pesoCombate: toDouble(map['pesoCombate']),
+      costoAdquisicion: toDouble(map['costoAdquisicion']),
+      precioVenta: toDouble(map['precioVenta']),
+      
+      notas: map['notas']?.toString(),
+      fotoPath: map['fotoPath']?.toString(),
+      videoUrl: map['videoUrl']?.toString(),
+      
+      // Genealogía
+      padreId: map['padreId']?.toString() ?? map['idPadre']?.toString(),
+      madreId: map['madreId']?.toString() ?? map['idMadre']?.toString(),
+      nombrePadre: map['nombrePadre']?.toString(),
+      nombreMadre: map['nombreMadre']?.toString(),
+      nombreAbueloPaterno: map['nombreAbueloPaterno']?.toString(),
+      nombreAbuelaPaterna: map['nombreAbuelaPaterna']?.toString(),
+      nombreAbueloMaterno: map['nombreAbueloMaterno']?.toString(),
+      nombreAbuelaMaterna: map['nombreAbuelaMaterna']?.toString(),
+      
+      // Aquí usamos la función segura toListString
+      vacunas: toListString(map['vacunas']),
+      peleas: toListString(map['peleas']),
     );
   }
-
-  /// Método toString para depuración
-  /// Retorna una representación legible del objeto Gallo
-  @override
-  String toString() {
-    return 'Gallo(id: $id, placa: $placa, nombre: $nombre, sexo: $sexo, '
-        'fechaNacimiento: $fechaNacimiento, lineaGenetica: $lineaGenetica, '
-        'colorPluma: $colorPluma, estado: $estado)';
-  }
-
-  /// Método de igualdad para comparar dos objetos Gallo
-  /// Compara basándose en el ID único de cada gallo
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Gallo && runtimeType == other.runtimeType && id == other.id;
-
-  /// Método hashCode para usar Gallo en conjuntos o mapas
-  @override
-  int get hashCode => id.hashCode;
 }
