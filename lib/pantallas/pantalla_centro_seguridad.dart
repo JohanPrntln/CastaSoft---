@@ -45,7 +45,10 @@ class _PantallaCentroSeguridadState extends State<PantallaCentroSeguridad> {
       );
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        // 🔥 EL TRUCO: Capturamos el mensajero en una variable ANTES de mostrar el mensaje
+        final messenger = ScaffoldMessenger.of(context);
+        
+        messenger.showSnackBar(
           SnackBar(
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -70,7 +73,12 @@ class _PantallaCentroSeguridadState extends State<PantallaCentroSeguridad> {
             backgroundColor: Colors.green.shade800,
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 8),
-            action: SnackBarAction(label: 'CERRAR', textColor: Colors.white, onPressed: () => ScaffoldMessenger.of(context).hideCurrentSnackBar()),
+            action: SnackBarAction(
+              label: 'CERRAR', 
+              textColor: Colors.white, 
+              // Usamos la variable guardada en lugar del context volátil
+              onPressed: () => messenger.hideCurrentSnackBar() 
+            ),
           ),
         );
       }
@@ -149,7 +157,7 @@ class _PantallaCentroSeguridadState extends State<PantallaCentroSeguridad> {
               decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.blue.shade200)),
               child: Row(
                 children: [
-                  Icon(FontAwesomeIcons.circleInfo, color: Colors.blue.shade700, size: 28),
+                  FaIcon(FontAwesomeIcons.circleInfo, color: Colors.blue.shade700, size: 28),
                   const SizedBox(width: 15),
                   Expanded(child: Text('Protege tu inventario. Es recomendable hacer una copia de seguridad semanalmente y guardarla en la nube.', style: TextStyle(color: Colors.blue.shade900, fontSize: 13))),
                 ],
@@ -203,18 +211,29 @@ class _PantallaCentroSeguridadState extends State<PantallaCentroSeguridad> {
   }
 
   Widget _buildCardOpcion({
-    required String titulo, required String descripcion, required IconData icono, required Color colorIcono,
+    required String titulo, required String descripcion, required dynamic icono, required Color colorIcono,
     required String botonTexto, required Color botonColor, required bool cargando, required VoidCallback onTap,
   }) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))]),
+      decoration: BoxDecoration(
+        color: Colors.white, 
+        borderRadius: BorderRadius.circular(15), 
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))]
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: colorIcono.withOpacity(0.1), shape: BoxShape.circle), child: Icon(icono, color: colorIcono, size: 24)),
+              Container(
+                padding: const EdgeInsets.all(12), 
+                decoration: BoxDecoration(color: colorIcono.withValues(alpha: 0.1), shape: BoxShape.circle), 
+                // AQUÍ ESTÁ LA CORRECCIÓN DEL ÍCONO
+                child: icono is IconData 
+                    ? Icon(icono, color: colorIcono, size: 24)
+                    : FaIcon(icono, color: colorIcono, size: 24)
+              ),
               const SizedBox(width: 15),
               Expanded(child: Text(titulo, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A)))),
             ],

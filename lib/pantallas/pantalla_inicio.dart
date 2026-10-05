@@ -117,7 +117,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
         backgroundColor: const Color(0xFFD4AF37),
         elevation: 4,
         tooltip: 'Registrar Nuevo Gallo',
-        child: const Icon(FontAwesomeIcons.plus, color: Color(0xFF1E3A8A)),
+        child: const FaIcon(FontAwesomeIcons.plus, color: Color(0xFF1E3A8A)),
       ),
     );
   }
@@ -319,7 +319,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
                         // CAMBIO DE ICONO: Pluma en vez de KiwiBird
-                        child: const Icon(FontAwesomeIcons.featherPointed, color: Colors.white, size: 24),
+                        child: const FaIcon(FontAwesomeIcons.featherPointed, color: Colors.white, size: 24),
                       ),
                     ],
                   ),
@@ -372,7 +372,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
-                    child: const Icon(FontAwesomeIcons.sackDollar, color: Colors.white, size: 24),
+                    child: const FaIcon(FontAwesomeIcons.sackDollar, color: Colors.white, size: 24),
                   ),
                 ],
               ),
@@ -383,16 +383,18 @@ class _PantallaInicioState extends State<PantallaInicio> {
     );
   }
 
-  Widget _buildMiniDato(String label, String valor, IconData icono) {
+  Widget _buildMiniDato(String label, String valor, dynamic icono) {
     return Column(
       children: [
-        Icon(icono, color: Colors.white70, size: 14),
+        icono is IconData 
+            ? Icon(icono, color: Colors.white70, size: 14)
+            : FaIcon(icono, color: Colors.white70, size: 14),
         const SizedBox(height: 4),
         Text(valor, style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
         Text(label, style: GoogleFonts.poppins(color: Colors.white54, fontSize: 10)),
       ],
     );
-  }
+}
 
   // TARJETA CRUCES
   Widget _buildTarjetaModuloCruces() {
@@ -423,7 +425,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
-              child: const Icon(FontAwesomeIcons.dna, color: Colors.white, size: 24),
+              child: const FaIcon(FontAwesomeIcons.dna, color: Colors.white, size: 24),
             ),
           ],
         ),
@@ -464,7 +466,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                   child: Column(
                     children: [
                       // Cambio de icono aquí también si quieres
-                      Icon(FontAwesomeIcons.featherPointed, size: 40, color: Colors.grey.shade300),
+                      FaIcon(FontAwesomeIcons.featherPointed, size: 40, color: Colors.grey.shade300),
                       const SizedBox(height: 10),
                       Text('No se encontraron gallos', style: GoogleFonts.poppins(color: Colors.grey)),
                     ],
@@ -526,7 +528,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                     
                     // Opción 1: Editar Perfil
                     ListTile(
-                      leading: const Icon(FontAwesomeIcons.userPen, color: Color(0xFF1E3A8A)),
+                      leading: const FaIcon(FontAwesomeIcons.userPen, color: Color(0xFF1E3A8A)),
                       title: const Text('Editar Perfil de Criador', style: TextStyle(fontWeight: FontWeight.w600)),
                       onTap: () {
                         Navigator.pop(ctx); // Cierra el menú
@@ -537,7 +539,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                     
                     // Opción 2: Centro de Seguridad
                     ListTile(
-                      leading: Icon(FontAwesomeIcons.shieldHalved, color: Colors.green.shade600),
+                      leading: FaIcon(FontAwesomeIcons.shieldHalved, color: Colors.green.shade600),
                       title: const Text('Centro de Seguridad y Reportes', style: TextStyle(fontWeight: FontWeight.w600)),
                       subtitle: const Text('Copias de seguridad y exportación'),
                       onTap: () {
@@ -598,7 +600,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
         decoration: InputDecoration(
           hintText: 'Buscar placa, nombre...',
           hintStyle: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade400),
-          prefixIcon: const Icon(FontAwesomeIcons.magnifyingGlass, size: 14, color: Colors.grey),
+          prefixIcon: const FaIcon(FontAwesomeIcons.magnifyingGlass, size: 14, color: Colors.grey),
           contentPadding: const EdgeInsets.symmetric(vertical: 0),
           filled: true,
           fillColor: Colors.grey.shade100,
@@ -636,7 +638,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(10)),
-        child: Icon(FontAwesomeIcons.rightFromBracket, size: 16, color: Colors.red.shade400),
+        child: FaIcon(FontAwesomeIcons.rightFromBracket, size: 16, color: Colors.red.shade400),
       ),
     );
   }
@@ -681,7 +683,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
       width: 45, height: 45,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(color: const Color(0xFF1E3A8A).withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
-      child: const Icon(FontAwesomeIcons.houseUser, color: Color(0xFF1E3A8A), size: 20),
+      child: const FaIcon(FontAwesomeIcons.houseUser, color: Color(0xFF1E3A8A), size: 20),
     );
   }
 }

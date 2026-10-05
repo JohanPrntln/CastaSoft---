@@ -15,6 +15,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:castasoft/modelos/usuario_modelo.dart';
 import 'package:castasoft/proveedores/usuario_proveedor.dart';
 import 'package:gal/gal.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class PantallaExportarPedigree extends StatefulWidget {
   final Gallo gallo;
@@ -137,23 +138,33 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
 
       if (imageBytes != null) {
         final String fileName = 'pedigree_${widget.gallo.placa}_${DateTime.now().millisecondsSinceEpoch}.png';
-        final Directory tempDir = await getTemporaryDirectory();
-        final File tempFile = await File('${tempDir.path}/$fileName').create();
-        await tempFile.writeAsBytes(imageBytes);
-
-        if (soloCompartir) {
-          await Share.shareXFiles([XFile(tempFile.path)], text: 'Certificado de Pedigrí - ${widget.gallo.nombre}');
+        
+        // 🔥 EL TRUCO BIFURCADO:
+        if (kIsWeb) {
+          // Si estamos en la Web, obligamos al navegador a descargar el archivo
+          final xfile = XFile.fromData(imageBytes, mimeType: 'image/png', name: fileName);
+          await xfile.saveTo(fileName); 
+          if(mounted) _mostrarMensajeExito('¡Descargado en tu navegador!');
         } else {
-          if (Platform.isAndroid || Platform.isIOS) {
-            await Gal.putImage(tempFile.path);
-            if(mounted) _mostrarMensajeExito('¡Guardado en Galería!');
+          // Si estamos en Windows/Android/iOS, usamos tu código nativo original
+          final Directory tempDir = await getTemporaryDirectory();
+          final File tempFile = await File('${tempDir.path}/$fileName').create();
+          await tempFile.writeAsBytes(imageBytes);
+
+          if (soloCompartir) {
+            await Share.shareXFiles([XFile(tempFile.path)], text: 'Certificado de Pedigrí - ${widget.gallo.nombre}');
           } else {
-             final downloadsDir = await getDownloadsDirectory();
-             if (downloadsDir != null) {
-               final String savePath = '${downloadsDir.path}\\$fileName';
-               await tempFile.copy(savePath);
-               if(mounted) _mostrarMensajeExito('Guardado en Descargas');
-             }
+            if (Platform.isAndroid || Platform.isIOS) {
+              await Gal.putImage(tempFile.path);
+              if(mounted) _mostrarMensajeExito('¡Guardado en Galería!');
+            } else {
+               final downloadsDir = await getDownloadsDirectory();
+               if (downloadsDir != null) {
+                 final String savePath = '${downloadsDir.path}\\$fileName';
+                 await tempFile.copy(savePath);
+                 if(mounted) _mostrarMensajeExito('Guardado en Descargas');
+               }
+            }
           }
         }
       }
@@ -162,8 +173,7 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
     } finally {
       if(mounted) setState(() => _cargando = false);
     }
-  }
-
+}
   void _mostrarMensajeExito(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Row(children: [const Icon(Icons.check_circle, color: Colors.white), const SizedBox(width: 10), Expanded(child: Text(mensaje))]),
@@ -438,12 +448,24 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
     return Padding(padding: const EdgeInsets.only(bottom: 15, top: 10), child: Text(titulo, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700, color: const Color(0xFF4E342E))));
   }
 
-  Widget _input(String label, TextEditingController ctrl, {IconData? icon, bool isNumber = false}) {
+  Widget _input(String label, TextEditingController ctrl, {dynamic icon, bool isNumber = false}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
       child: TextField(
         controller: ctrl, keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-        decoration: InputDecoration(labelText: label, prefixIcon: icon != null ? Icon(icon, size: 20, color: Colors.grey.shade600) : null, isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), filled: true, fillColor: Colors.grey.shade50, contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 18)),
+        decoration: InputDecoration(
+          labelText: label, 
+          prefixIcon: icon != null 
+              ? (icon is IconData 
+                  ? Icon(icon, size: 20, color: Colors.grey.shade600) 
+                  : FaIcon(icon, size: 20, color: Colors.grey.shade600)) 
+              : null, 
+          isDense: true, 
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), 
+          filled: true, 
+          fillColor: Colors.grey.shade50, 
+          contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 18)
+        ),
         onChanged: (v) => setState((){}),
       ),
     );
@@ -515,7 +537,7 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
         color: imagen == null ? Colors.white.withOpacity(0.9) : null,
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(2, 2))]
       ),
-      child: imagen == null ? const Icon(FontAwesomeIcons.crown, color: Color(0xFFD4AF37), size: 40) : null,
+      child: imagen == null ? const FaIcon(FontAwesomeIcons.crown, color: Color(0xFFD4AF37), size: 40) : null,
     );
   }
 

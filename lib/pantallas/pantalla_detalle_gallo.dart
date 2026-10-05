@@ -102,7 +102,7 @@ class PantallaDetalleGallo extends StatelessWidget {
         actions: [
           // 🔥 BOTÓN: GENERAR PEDIGRÍ
           IconButton(
-            icon: const Icon(FontAwesomeIcons.certificate, color: Color(0xFFD4AF37)), // Icono dorado
+            icon: const FaIcon(FontAwesomeIcons.certificate, color: Color(0xFFD4AF37)), // Icono dorado
             tooltip: 'Generar Pedigrí',
             onPressed: () {
               Navigator.push(
@@ -197,7 +197,7 @@ class PantallaDetalleGallo extends StatelessWidget {
                       : null,
                 ),
                 child: proveedorImagen == null 
-                    ? const Icon(FontAwesomeIcons.kiwiBird, size: 80, color: Colors.grey) 
+                    ? const FaIcon(FontAwesomeIcons.kiwiBird, size: 80, color: Colors.grey) 
                     : null,
               ),
             ),
@@ -394,18 +394,20 @@ class PantallaDetalleGallo extends StatelessWidget {
     );
   }
 
-  Widget _datoCard(IconData icon, String valor, String label) {
+  Widget _datoCard(dynamic icon, String valor, String label) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 15),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 5)],
+          boxShadow: [BoxShadow(color: Colors.grey.withValues(alpha: 0.1), blurRadius: 5)],
         ),
         child: Column(
           children: [
-            Icon(icon, color: const Color(0xFF1E3A8A), size: 20),
+            icon is IconData 
+                ? Icon(icon, color: const Color(0xFF1E3A8A), size: 20)
+                : FaIcon(icon, color: const Color(0xFF1E3A8A), size: 20),
             const SizedBox(height: 5),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -420,11 +422,12 @@ class PantallaDetalleGallo extends StatelessWidget {
       ),
     );
   }
-
-  Widget _tituloSeccion(String titulo, IconData icono) {
+Widget _tituloSeccion(String titulo, dynamic icono) {
     return Row(
       children: [
-        Icon(icono, size: 18, color: const Color(0xFFD4AF37)), 
+        icono is IconData 
+            ? Icon(icono, size: 18, color: const Color(0xFFD4AF37))
+            : FaIcon(icono, size: 18, color: const Color(0xFFD4AF37)),
         const SizedBox(width: 8),
         Text(titulo, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A))),
       ],
@@ -453,10 +456,17 @@ class PantallaDetalleGallo extends StatelessWidget {
     );
   }
 
-  Widget _filaPariente(String rol, String nombre, IconData icono, Color colorIcono) {
+  Widget _filaPariente(String rol, String nombre, dynamic icono, Color colorIcono) {
     return Row(
       children: [
-        CircleAvatar(radius: 12, backgroundColor: colorIcono.withOpacity(0.1), child: Icon(icono, size: 14, color: colorIcono)),
+        CircleAvatar(
+          radius: 12, 
+          backgroundColor: colorIcono.withValues(alpha: 0.1), // Actualizado a withValues
+          // AQUÍ ESTÁ LA MAGIA PARA EL ÍCONO
+          child: icono is IconData 
+              ? Icon(icono, size: 14, color: colorIcono)
+              : FaIcon(icono, size: 14, color: colorIcono)
+        ),
         const SizedBox(width: 10),
         Expanded(
           child: Column(

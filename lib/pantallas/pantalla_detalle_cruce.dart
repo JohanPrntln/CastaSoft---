@@ -190,17 +190,19 @@ class PantallaDetalleCruce extends StatelessWidget {
   }
 
   // WIDGET CIRCULAR PARA SEXO
-  Widget _buildDatoCircular(String label, int valor, Color color, IconData icon) {
+  Widget _buildDatoCircular(String label, int valor, Color color, dynamic icon) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
-          Icon(icon, color: color, size: 24),
+          icon is IconData 
+              ? Icon(icon, color: color, size: 24)
+              : FaIcon(icon, color: color, size: 24),
           const SizedBox(height: 5),
           Text('$valor', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
           Text(label, style: TextStyle(fontSize: 12, color: color)),
@@ -238,7 +240,7 @@ class PantallaDetalleCruce extends StatelessWidget {
     );
   }
   
-  Widget _buildInfoCard(String titulo, IconData icono, List<Widget> hijos) {
+  Widget _buildInfoCard(String titulo, dynamic icono, List<Widget> hijos) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),

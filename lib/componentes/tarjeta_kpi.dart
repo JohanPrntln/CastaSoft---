@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart'; // Importación añadida
 
 /// Componente TarjetaKPI - Tarjeta de indicador clave de desempeño
 ///
@@ -23,7 +24,7 @@ import 'package:google_fonts/google_fonts.dart';
 /// TarjetaKPI(
 ///   titulo: 'Gallos Activos',
 ///   valor: 25,
-///   colorFondo: Colors.blue.withOpacity(0.1),
+///   colorFondo: Colors.blue.withValues(alpha: 0.1), // Actualizado a withValues
 /// )
 /// ```
 class TarjetaKPI extends StatelessWidget {
@@ -37,7 +38,7 @@ class TarjetaKPI extends StatelessWidget {
   final Color colorFondo;
 
   /// Icono representativo opcional
-  final IconData? icono;
+  final dynamic icono;
 
   /// Constructor del componente TarjetaKPI
   const TarjetaKPI({
@@ -102,7 +103,10 @@ class TarjetaKPI extends StatelessWidget {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(icono, size: 18, color: dorado),
+                    // AQUÍ ESTÁ LA CORRECCIÓN CLAVE
+                    child: icono is IconData 
+                        ? Icon(icono, size: 18, color: dorado)
+                        : FaIcon(icono, size: 18, color: dorado),
                   ),
               ],
             ),

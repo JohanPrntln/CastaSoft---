@@ -196,7 +196,7 @@ class _PantallaListaCrucesState extends State<PantallaListaCruces> {
                                         decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade300)),
                                         child: c.fotoPath != null && c.fotoPath!.startsWith('base64')
                                           ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.memory(base64Decode(c.fotoPath!.split(',').last), fit: BoxFit.cover))
-                                          : Icon(FontAwesomeIcons.egg, color: _colorTema, size: 30),
+                                          : FaIcon(FontAwesomeIcons.egg, color: _colorTema, size: 30),
                                       ),
                                     ),
                                     const SizedBox(width: 15),
@@ -208,7 +208,7 @@ class _PantallaListaCrucesState extends State<PantallaListaCruces> {
                                         children: [
                                           Text('${c.nombrePadre} x ${c.nombreMadre}', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 15)),
                                           const SizedBox(height: 4),
-                                          Row(children: [Icon(FontAwesomeIcons.calendar, size: 12, color: Colors.grey.shade500), const SizedBox(width: 5), Text(DateFormat('dd MMM yyyy').format(c.fechaCruce), style: const TextStyle(color: Colors.grey, fontSize: 12))]),
+                                          Row(children: [FaIcon(FontAwesomeIcons.calendar, size: 12, color: Colors.grey.shade500), const SizedBox(width: 5), Text(DateFormat('dd MMM yyyy').format(c.fechaCruce), style: const TextStyle(color: Colors.grey, fontSize: 12))]),
                                           const SizedBox(height: 8),
                                           Wrap(
                                             spacing: 6, runSpacing: 6,
@@ -295,14 +295,22 @@ class _PantallaListaCrucesState extends State<PantallaListaCruces> {
     );
   }
 
-  Widget _buildChip(String texto, Color color, IconData icon) {
+  Widget _buildChip(String texto, Color color, dynamic icon) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: color.withOpacity(0.3))),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1), // Actualizado a sintaxis moderna
+        borderRadius: BorderRadius.circular(20), 
+        border: Border.all(color: color.withValues(alpha: 0.3)) // Actualizado a sintaxis moderna
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 10, color: color), const SizedBox(width: 4),
+          // AQUÍ ESTÁ LA SOLUCIÓN DEL ICONO
+          icon is IconData 
+              ? Icon(icon, size: 10, color: color)
+              : FaIcon(icon, size: 10, color: color), 
+          const SizedBox(width: 4),
           Text(texto, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
         ],
       ),
@@ -314,7 +322,7 @@ class _PantallaListaCrucesState extends State<PantallaListaCruces> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(FontAwesomeIcons.dna, size: 80, color: Colors.grey.shade300),
+          FaIcon(FontAwesomeIcons.dna, size: 80, color: Colors.grey.shade300),
           const SizedBox(height: 20),
           Text('No se encontraron cruces', style: GoogleFonts.poppins(fontSize: 18, color: Colors.grey)),
         ],

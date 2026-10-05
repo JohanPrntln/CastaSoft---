@@ -187,13 +187,15 @@ class _PantallaConfiguracionPerfilState extends State<PantallaConfiguracionPerfi
     );
   }
 
-  Widget _buildInput(TextEditingController ctrl, String label, IconData icon, bool requerido, {bool isNumber = false}) {
+  Widget _buildInput(TextEditingController ctrl, String label, dynamic icon, bool requerido, {bool isNumber = false}) {
     return TextFormField(
       controller: ctrl,
       keyboardType: isNumber ? TextInputType.phone : TextInputType.text,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: const Color(0xFF1E3A8A), size: 18),
+        prefixIcon: icon is IconData 
+            ? Icon(icon, color: const Color(0xFF1E3A8A), size: 18)
+            : FaIcon(icon, color: const Color(0xFF1E3A8A), size: 18),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
         fillColor: Colors.grey.shade50,

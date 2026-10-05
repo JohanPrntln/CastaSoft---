@@ -88,7 +88,7 @@ class TarjetaGallo extends StatelessWidget {
         widgetImagen = const Icon(Icons.broken_image, color: Colors.grey);
       }
     } else {
-      widgetImagen = const Icon(FontAwesomeIcons.kiwiBird, size: 30, color: Color(0xFF1E3A8A));
+      widgetImagen = const FaIcon(FontAwesomeIcons.kiwiBird, size: 30, color: Color(0xFF1E3A8A));
     }
 
     return Card(
@@ -172,7 +172,7 @@ class TarjetaGallo extends StatelessWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(FontAwesomeIcons.cakeCandles, size: 10, color: Colors.grey),
+                          const FaIcon(FontAwesomeIcons.cakeCandles, size: 10, color: Colors.grey),
                           const SizedBox(width: 4),
                           Text(
                             _calcularEdadBonita(gallo.fechaNacimiento),
@@ -209,7 +209,7 @@ class TarjetaGallo extends StatelessWidget {
                           const SizedBox(width: 10),
                           
                           if (gallo.pesoActual != null) ...[
-                            const Icon(FontAwesomeIcons.weightScale, size: 10, color: Colors.grey),
+                            const FaIcon(FontAwesomeIcons.weightScale, size: 10, color: Colors.grey),
                             const SizedBox(width: 4),
                             Text(
                               '${gallo.pesoActual} Lbs',
@@ -234,7 +234,7 @@ class TarjetaGallo extends StatelessWidget {
                               child: Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(6)),
-                                child: Icon(FontAwesomeIcons.pencil, size: 14, color: Colors.blue.shade800),
+                                child: FaIcon(FontAwesomeIcons.pencil, size: 14, color: Colors.blue.shade800),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -243,7 +243,7 @@ class TarjetaGallo extends StatelessWidget {
                               child: Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(6)),
-                                child: Icon(FontAwesomeIcons.trash, size: 14, color: Colors.red.shade800),
+                                child: FaIcon(FontAwesomeIcons.trash, size: 14, color: Colors.red.shade800),
                               ),
                             ),
                         ],

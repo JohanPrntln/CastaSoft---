@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // 🔥 IMPORTANTE: Para verificar la sesión
 import 'firebase_options.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 // === TUS IMPORTACIONES ===
 import 'package:castasoft/pantallas/pantalla_inicio.dart';
@@ -31,8 +32,9 @@ void main() async {
   }
 
   // 3. Inicializar DB Local (Solo por seguridad/legado)
-  await AyudanteDB.instancia.inicializarDB();
-
+  if(!kIsWeb){
+    await AyudanteDB.instancia.inicializarDB();
+  }
   // 4. Ejecutar la aplicación
   runApp(const AplicacionCastaSoft());
 }

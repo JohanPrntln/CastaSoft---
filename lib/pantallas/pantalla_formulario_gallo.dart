@@ -10,6 +10,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart'; 
 import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 
 class PantallaFormularioGallo extends StatefulWidget {
   final Gallo? galloEditar;
@@ -61,7 +63,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   String? _madreId;
   
   bool _esEdicion = false;
-  File? _imagenNuevaSeleccionada; 
+  XFile? _imagenNuevaSeleccionada; 
   String? _fotoActualBase64; 
 
   List<String> _listaVacunas = [];
@@ -159,9 +161,10 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
       maxWidth: 800,    
     );
     if (image != null) {
-      setState(() => _imagenNuevaSeleccionada = File(image.path));
+      // Guardamos el XFile directamente sin convertirlo
+      setState(() => _imagenNuevaSeleccionada = image); 
     }
-  }
+}
 
   double? _limpiarNumero(String valor, {bool esDinero = false}) {
     if (valor.trim().isEmpty) return null;
@@ -270,10 +273,10 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
           unselectedLabelColor: Colors.white60,
           isScrollable: true,
           tabs: const [
-            Tab(icon: Icon(FontAwesomeIcons.kiwiBird), text: 'Datos'),
-            Tab(icon: Icon(FontAwesomeIcons.sitemap), text: 'Genealogía'),
-            Tab(icon: Icon(FontAwesomeIcons.heartPulse), text: 'Gestión'),
-            Tab(icon: Icon(FontAwesomeIcons.sackDollar), text: 'Finanzas'),
+            Tab(icon: FaIcon(FontAwesomeIcons.kiwiBird), text: 'Datos'),
+            Tab(icon: FaIcon(FontAwesomeIcons.sitemap), text: 'Genealogía'),
+            Tab(icon: FaIcon(FontAwesomeIcons.heartPulse), text: 'Gestión'),
+            Tab(icon: FaIcon(FontAwesomeIcons.sackDollar), text: 'Finanzas'),
           ],
         ),
       ),
@@ -303,7 +306,11 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   Widget _buildFotoPicker() {
     ImageProvider? imagenMostrar;
     if (_imagenNuevaSeleccionada != null) {
-      imagenMostrar = FileImage(_imagenNuevaSeleccionada!);
+      // 🔥 EL TRUCO SE MANTIENE
+      imagenMostrar = kIsWeb 
+          ? NetworkImage(_imagenNuevaSeleccionada!.path) as ImageProvider 
+          // Reconstruimos el File solo para el renderizado nativo
+          : FileImage(File(_imagenNuevaSeleccionada!.path)); 
     } else if (_fotoActualBase64 != null && _fotoActualBase64!.startsWith('base64,')) {
       try {
         final String base64String = _fotoActualBase64!.split(',').last;
@@ -543,7 +550,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   Widget _buildInput(
     TextEditingController ctrl, 
     String label, {
-      IconData? icon, 
+      dynamic icon, 
       bool isNumber = false, 
       bool isMoney = false, 
       bool validacion = false, 
@@ -567,20 +574,23 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     );
   }
 
-  InputDecoration _inputDeco(String label, {IconData? icon}) {
+  InputDecoration _inputDeco(String label, {dynamic icon}) {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(fontSize: 13),
-      prefixIcon: icon != null ? Icon(icon, size: 18, color: const Color(0xFF1E3A8A)) : null,
+      prefixIcon: icon != null 
+          ? (icon is IconData 
+              ? Icon(icon, size: 18, color: const Color(0xFF1E3A8A)) 
+              : FaIcon(icon, size: 18, color: const Color(0xFF1E3A8A))) 
+          : null,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
     );
-  }
-
+}
   Widget _buildDropdown(String label, List<String> items, String? valor, Function(String?) onChanged) {
     return DropdownButtonFormField<String>(
       isExpanded: true,
-      value: valor,
+      initialValue: valor,
       decoration: _inputDeco(label),
       items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 14)))).toList(),
       onChanged: onChanged,

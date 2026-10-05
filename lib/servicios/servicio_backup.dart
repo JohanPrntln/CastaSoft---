@@ -7,10 +7,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/modelos/cruce_modelo.dart';
 import 'package:castasoft/modelos/usuario_modelo.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:typed_data'; 
 
 class ServicioBackup {
   // ==========================================
-  // 1. EXPORTAR DATOS A JSON 
+  // 1. EXPORTAR DATOS A JSON (ADAPTADO PARA WEB Y ESCRITORIO)
   // ==========================================
   static Future<String> exportarBackupJSON({
     required UsuarioPerfil? perfil,
@@ -24,7 +26,8 @@ class ServicioBackup {
           'fecha_creacion': DateTime.now().toIso8601String(),
           'total_gallos': gallos.length,
           'total_cruces': cruces.length,
-          'plataforma_origen': Platform.operatingSystem,
+          // 🔥 Evitamos leer el Platform en la web para que no explote
+          'plataforma_origen': kIsWeb ? 'Web' : Platform.operatingSystem,
         },
         'perfil': perfil != null ? perfil.toMap() : null,
         'gallos': gallos.map((g) => g.toMap()).toList(),
@@ -35,23 +38,34 @@ class ServicioBackup {
       final String fechaFormateada = DateFormat('dd_MMM_yyyy_HH_mm').format(DateTime.now());
       final String fileName = 'CastaSoft_Respaldo_$fechaFormateada.json';
 
-      Directory? directorioDestino;
-
-      if (Platform.isAndroid) {
-        directorioDestino = Directory('/storage/emulated/0/Download');
-        if (!await directorioDestino.exists()) {
-          directorioDestino = await getExternalStorageDirectory(); 
-        }
+      // 🔥 EL TRUCO BIFURCADO
+      if (kIsWeb) {
+        // Si estamos en la web, forzamos la descarga desde el navegador
+        final bytes = utf8.encode(jsonString);
+        final xfile = XFile.fromData(Uint8List.fromList(bytes), mimeType: 'application/json', name: fileName);
+        await xfile.saveTo(fileName);
+        
+        return 'Descargado en tu navegador (Carpeta de Descargas)';
       } else {
-        directorioDestino = await getDownloadsDirectory();
+        // Si estamos en Windows, Android o iOS, usamos las rutas nativas
+        Directory? directorioDestino;
+
+        if (Platform.isAndroid) {
+          directorioDestino = Directory('/storage/emulated/0/Download');
+          if (!await directorioDestino.exists()) {
+            directorioDestino = await getExternalStorageDirectory(); 
+          }
+        } else {
+          directorioDestino = await getDownloadsDirectory();
+        }
+
+        if (directorioDestino == null) throw Exception('No se encontró la carpeta.');
+
+        final File backupFile = File('${directorioDestino.path}/$fileName');
+        await backupFile.writeAsString(jsonString);
+
+        return backupFile.path;
       }
-
-      if (directorioDestino == null) throw Exception('No se encontró la carpeta.');
-
-      final File backupFile = File('${directorioDestino.path}/$fileName');
-      await backupFile.writeAsString(jsonString);
-
-      return backupFile.path;
     } catch (e) {
       throw Exception('Error al guardar: $e');
     }

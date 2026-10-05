@@ -47,6 +47,7 @@ class DefaultFirebaseOptions {
     projectId: 'castasoft-c6be3',
     authDomain: 'castasoft-c6be3.firebaseapp.com',
     storageBucket: 'castasoft-c6be3.firebasestorage.app',
+    measurementId: 'G-1NFEZPXLF9',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
@@ -56,7 +57,6 @@ class DefaultFirebaseOptions {
     projectId: 'castasoft-c6be3',
     storageBucket: 'castasoft-c6be3.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyA3Alhhz5uJrQEv1vjH8UMIrDWaUxeWMGA',
     appId: '1:759962794686:ios:c4d3debf52fcbd5fecbcef',
@@ -65,7 +65,6 @@ class DefaultFirebaseOptions {
     storageBucket: 'castasoft-c6be3.firebasestorage.app',
     iosBundleId: 'com.example.castasoft',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyA3Alhhz5uJrQEv1vjH8UMIrDWaUxeWMGA',
     appId: '1:759962794686:ios:c4d3debf52fcbd5fecbcef',
@@ -82,5 +81,6 @@ class DefaultFirebaseOptions {
     projectId: 'castasoft-c6be3',
     authDomain: 'castasoft-c6be3.firebaseapp.com',
     storageBucket: 'castasoft-c6be3.firebasestorage.app',
+    measurementId: 'G-N245C08GL6',
   );
 }

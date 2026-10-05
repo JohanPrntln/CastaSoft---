@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:castasoft/modelos/cruce_modelo.dart';
 import 'package:castasoft/proveedores/cruces_proveedor.dart';
@@ -55,7 +56,7 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
   ];
 
   DateTime _fechaSeleccionada = DateTime.now();
-  File? _imagenNueva;
+  XFile? _imagenNueva;
   String? _fotoActualBase64; 
   bool _guardando = false;
   bool _esEdicion = false;
@@ -101,7 +102,10 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
   Future<void> _seleccionarFoto() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 25, maxWidth: 800);
-    if (picked != null) setState(() => _imagenNueva = File(picked.path));
+    if (picked != null) {
+      // Lo asignamos directo, sin el File()
+      setState(() => _imagenNueva = picked); 
+    }
   }
 
   // 🔥 NUEVO: Función para borrar la foto
@@ -385,7 +389,10 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
     bool hayFoto = false;
 
     if (_imagenNueva != null) {
-      imgProvider = FileImage(_imagenNueva!);
+      // 🔥 AQUÍ USAMOS kIsWeb Y DESAPARECE TU AVISO
+      imgProvider = kIsWeb 
+          ? NetworkImage(_imagenNueva!.path) as ImageProvider 
+          : FileImage(File(_imagenNueva!.path));
       hayFoto = true;
     } else if (_fotoActualBase64 != null && _fotoActualBase64!.startsWith('base64')) {
       imgProvider = MemoryImage(base64Decode(_fotoActualBase64!.split(',').last));
@@ -452,10 +459,21 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
     );
   }
 
-  InputDecoration _inputDeco(String label, IconData icon) {
+  InputDecoration _inputDeco(String label, dynamic icon) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon, size: 18, color: _colorTema),
+      labelStyle: const TextStyle(fontSize: 13),
+      prefixIcon: icon != null 
+          ? Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                icon is IconData 
+                    ? Icon(icon, size: 18, color: const Color(0xFF1E3A8A)) // Ajusta el color si usas otro
+                    : FaIcon(icon, size: 18, color: const Color(0xFF1E3A8A))
+              ],
+            )
+          : null,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
     );
