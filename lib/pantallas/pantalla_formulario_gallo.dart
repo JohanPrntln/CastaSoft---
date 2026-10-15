@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' show File;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:google_fonts/google_fonts.dart';
@@ -10,12 +10,13 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart'; 
 import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
+import 'package:castasoft/componentes/icono_adaptativo.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 
 class PantallaFormularioGallo extends StatefulWidget {
   final Gallo? galloEditar;
-  const PantallaFormularioGallo({Key? key, this.galloEditar}) : super(key: key);
+  const PantallaFormularioGallo({super.key, this.galloEditar});
 
   @override
   State<PantallaFormularioGallo> createState() => _PantallaFormularioGalloState();
@@ -64,7 +65,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   
   bool _esEdicion = false;
   XFile? _imagenNuevaSeleccionada; 
-  String? _fotoActualBase64; 
+  Uint8List? _fotoActualBytes; // Foto guardada (ya decodificada y memoizada en el modelo)
 
   List<String> _listaVacunas = [];
   List<String> _listaPeleas = [];
@@ -127,13 +128,13 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     _fechaNacimiento = g.fechaNacimiento;
     _padreId = g.padreId;
     _madreId = g.madreId;
-    _fotoActualBase64 = g.fotoPath;
+    _fotoActualBytes = g.fotoBytes;
   }
 
   void _valoresPorDefecto() {
     _sexo = 'Macho';
-    _estado = 'Activo';
-    _etapaVida = 'Cría';
+    _estado = Gallo.estadosValidos.first;
+    _etapaVida = Gallo.etapasVida.first;
     _tipoCresta = 'Sierra';
   }
 
@@ -185,10 +186,14 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     }
     if (!_claveFormulario.currentState!.validate()) return;
 
+    // Se capturan ANTES de cualquier await (contexto asíncrono seguro)
+    final proveedor = context.read<GallosProveedor>();
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     setState(() => _estaGuardando = true);
 
     try {
-      final proveedor = context.read<GallosProveedor>();
       
       String? fotoFinalString;
       if (_imagenNuevaSeleccionada != null) {
@@ -238,18 +243,22 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         peleas: _listaPeleas,
       );
 
-      if (_esEdicion) {
-        await proveedor.actualizarGallo(gallo);
-        _mostrarSnack('Gallo actualizado correctamente', Colors.green);
-      } else {
-        await proveedor.crearGallo(gallo);
-        _mostrarSnack('Gallo creado correctamente', Colors.green);
-      }
-      
-      if (mounted) Navigator.pop(context);
+      // Sin red, el proveedor responde en <= 2.5 s con `confirmado == false`:
+      // el dato ya está en la caché local y Firestore lo sincronizará solo.
+      final bool confirmado = _esEdicion
+          ? await proveedor.actualizarGallo(gallo)
+          : await proveedor.crearGallo(gallo);
 
+      final accion = _esEdicion ? 'actualizado' : 'creado';
+      messenger.showSnackBar(SnackBar(
+        content: Text(confirmado
+            ? 'Gallo $accion correctamente'
+            : 'Gallo $accion sin conexión: se sincronizará al volver el internet'),
+        backgroundColor: confirmado ? Colors.green : Colors.orange.shade800,
+      ));
+      if (mounted) navigator.pop();
     } catch (e) {
-      _mostrarSnack('Error: $e', Colors.red);
+      messenger.showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _estaGuardando = false);
     }
@@ -311,11 +320,8 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
           ? NetworkImage(_imagenNuevaSeleccionada!.path) as ImageProvider 
           // Reconstruimos el File solo para el renderizado nativo
           : FileImage(File(_imagenNuevaSeleccionada!.path)); 
-    } else if (_fotoActualBase64 != null && _fotoActualBase64!.startsWith('base64,')) {
-      try {
-        final String base64String = _fotoActualBase64!.split(',').last;
-        imagenMostrar = MemoryImage(base64Decode(base64String));
-      } catch (e) { print('Error imagen: $e'); }
+    } else if (_fotoActualBytes != null) {
+      imagenMostrar = MemoryImage(_fotoActualBytes!);
     }
 
     return Center(
@@ -405,13 +411,22 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     final padres = gallos.where((g) => g.sexo == 'Macho' && g.id != widget.galloEditar?.id).toList();
     final madres = gallos.where((g) => g.sexo == 'Hembra' && g.id != widget.galloEditar?.id).toList();
 
+    // `initialValue` solo se lee al crear el FormField. Para conservar la
+    // reactividad (p. ej. si la lista de gallos llega después del primer
+    // frame), la Key depende del valor visible y fuerza a recrear el campo.
+    // Si el ancestro fue eliminado, se muestra vacío pero se conserva el
+    // `_padreId`/`_madreId` y sus nombres en texto (RN-03).
+    final String? padreVisible = padres.any((g) => g.id == _padreId) ? _padreId : null;
+    final String? madreVisible = madres.any((g) => g.id == _madreId) ? _madreId : null;
+
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
         _buildCard('Padres en el Sistema', [
           DropdownButtonFormField<String>(
+            key: ValueKey('padre-$padreVisible'),
             isExpanded: true,
-            value: _padreId,
+            initialValue: padreVisible,
             items: padres.map((g) => DropdownMenuItem(value: g.id, child: Text('${g.nombre} (${g.placa})', overflow: TextOverflow.ellipsis))).toList(),
             onChanged: (v) {
               setState(() {
@@ -429,8 +444,9 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
           ),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
+            key: ValueKey('madre-$madreVisible'),
             isExpanded: true,
-            value: _madreId,
+            initialValue: madreVisible,
             items: madres.map((g) => DropdownMenuItem(value: g.id, child: Text('${g.nombre} (${g.placa})', overflow: TextOverflow.ellipsis))).toList(),
             onChanged: (v) {
               setState(() {
@@ -471,7 +487,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   // PESTAÑA 3
   Widget _buildTabGestion() {
     // 🔥 Truco Anti-Crash: Lista nueva, pero agregamos la vieja temporalmente si la tiene
-    List<String> etapasFormulario = ['Cría', 'Pollos crestones', 'Pollonas', 'Muda', 'Postura', 'Padrote', 'Madrilla', 'Combate'];
+    final List<String> etapasFormulario = List.of(Gallo.etapasVida);
     if (_etapaVida != null && !etapasFormulario.contains(_etapaVida)) {
       etapasFormulario.add(_etapaVida!); 
     }
@@ -481,7 +497,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
       children: [
         _buildCard('Estado Actual', [
           _buildResponsiveDualInput(
-            _buildDropdown('Estado', ['Activo', 'Vendido', 'Baja', 'Retirado'], _estado, (v) => setState(() => _estado = v)),
+            _buildDropdown('Estado', Gallo.estadosValidos, _estado, (v) => setState(() => _estado = v)),
             // Pasamos la lista dinámica en vez de la estática
             _buildDropdown('Etapa', etapasFormulario, _etapaVida, (v) => setState(() => _etapaVida = v))
           ),
@@ -579,9 +595,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
       labelText: label,
       labelStyle: const TextStyle(fontSize: 13),
       prefixIcon: icon != null 
-          ? (icon is IconData 
-              ? Icon(icon, size: 18, color: const Color(0xFF1E3A8A)) 
-              : FaIcon(icon, size: 18, color: const Color(0xFF1E3A8A))) 
+          ? IconoAdaptativo.prefijo(icon, size: 18, color: const Color(0xFF1E3A8A))
           : null,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
@@ -589,8 +603,10 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
 }
   Widget _buildDropdown(String label, List<String> items, String? valor, Function(String?) onChanged) {
     return DropdownButtonFormField<String>(
+      // Key ligada al valor: si el estado cambia por código, el campo se recrea
+      key: ValueKey('$label-$valor'),
       isExpanded: true,
-      initialValue: valor,
+      initialValue: items.contains(valor) ? valor : null,
       decoration: _inputDeco(label),
       items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 14)))).toList(),
       onChanged: onChanged,
@@ -605,10 +621,12 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
           IconButton(
             icon: const Icon(Icons.add_circle, color: Color(0xFF1E3A8A)),
             onPressed: () {
-              if (ctrl.text.isNotEmpty) {
-                setState(() => lista.add(ctrl.text));
-                ctrl.clear();
+              // RN-07: prohibido insertar strings vacíos (o solo espacios)
+              final texto = ctrl.text.trim();
+              if (texto.isNotEmpty) {
+                setState(() => lista.add(texto));
               }
+              ctrl.clear();
             },
           )
         ]),
@@ -647,7 +665,8 @@ class CurrencyInputFormatter extends TextInputFormatter {
       return newValue;
     }
 
-    double value = double.parse(newValue.text);
+    final double? value = double.tryParse(newValue.text);
+    if (value == null) return newValue;
     final formatter = NumberFormat.currency(locale: 'es_CO', symbol: '', decimalDigits: 0);
     String newText = formatter.format(value).trim();
 

@@ -1,10 +1,9 @@
-import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'dart:io';
+import 'package:castasoft/componentes/icono_adaptativo.dart';
 
 // Modelos y Proveedores
 import 'package:castasoft/modelos/gallo_modelo.dart';
@@ -16,14 +15,14 @@ import 'package:castasoft/pantallas/pantalla_exportar_pedigree.dart';
 class PantallaDetalleGallo extends StatelessWidget {
   final Gallo gallo;
 
-  const PantallaDetalleGallo({Key? key, required this.gallo}) : super(key: key);
+  const PantallaDetalleGallo({super.key, required this.gallo});
 
   // ================= UTILIDADES =================
 
   void _mostrarImagenGrande(BuildContext context, ImageProvider imagen) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.9),
+      barrierColor: Colors.black.withValues(alpha: 0.9),
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: EdgeInsets.zero,
@@ -89,6 +88,12 @@ class PantallaDetalleGallo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Nombres de padre/madre: se resuelven una vez por build vía el índice O(1)
+    // del proveedor, priorizando el texto desnormalizado (RN-03).
+    final gallosProv = context.read<GallosProveedor>();
+    final nombrePadre = gallosProv.resolverNombrePariente(gallo.nombrePadre, gallo.padreId);
+    final nombreMadre = gallosProv.resolverNombrePariente(gallo.nombreMadre, gallo.madreId);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
@@ -135,7 +140,7 @@ class PantallaDetalleGallo extends StatelessWidget {
                 children: [
                   _buildResumenRapido(),
                   const SizedBox(height: 16),
-                  _buildSeccionGenealogia(context),
+                  _buildSeccionGenealogia(nombrePadre, nombreMadre),
                   const SizedBox(height: 16),
                   _buildSeccionSaludYCombate(),
                   const SizedBox(height: 16),
@@ -151,20 +156,11 @@ class PantallaDetalleGallo extends StatelessWidget {
   }
 
   Widget _buildEncabezado(BuildContext context) {
-    ImageProvider? proveedorImagen;
-    if (gallo.fotoPath != null) {
-      if (gallo.fotoPath!.startsWith('base64,')) {
-        try {
-          final String base64String = gallo.fotoPath!.split(',').last;
-          proveedorImagen = MemoryImage(base64Decode(base64String));
-        } catch (e) { print(e); }
-      } else {
-        File imgFile = File(gallo.fotoPath!);
-        if (imgFile.existsSync()) {
-          proveedorImagen = FileImage(imgFile);
-        }
-      }
-    }
+    // Bytes memoizados en el modelo: sin base64Decode ni E/S de disco en build().
+    // (Las rutas de archivo legadas ya no se leen aquí: `File.existsSync()` era
+    // E/S síncrona en el hilo de UI y lanzaba UnsupportedError en Web.)
+    final bytes = gallo.fotoBytes;
+    final ImageProvider? proveedorImagen = bytes != null ? MemoryImage(bytes) : null;
 
     return Container(
       width: double.infinity,
@@ -182,7 +178,7 @@ class PantallaDetalleGallo extends StatelessWidget {
             tag: gallo.id,
             child: GestureDetector(
               onTap: proveedorImagen != null 
-                  ? () => _mostrarImagenGrande(context, proveedorImagen!) 
+                  ? () => _mostrarImagenGrande(context, proveedorImagen) 
                   : null,
               child: Container(
                 width: 200, 
@@ -249,7 +245,7 @@ class PantallaDetalleGallo extends StatelessWidget {
     );
   }
 
-  Widget _buildSeccionGenealogia(BuildContext context) {
+  Widget _buildSeccionGenealogia(String nombrePadre, String nombreMadre) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -260,7 +256,7 @@ class PantallaDetalleGallo extends StatelessWidget {
           children: [
             _tituloSeccion('Genealogía', FontAwesomeIcons.sitemap),
             const SizedBox(height: 15),
-            _filaPariente('Padre', _obtenerNombrePadre(context), FontAwesomeIcons.mars, Colors.blue),
+            _filaPariente('Padre', nombrePadre, FontAwesomeIcons.mars, Colors.blue),
             Padding(
               padding: const EdgeInsets.only(left: 30, top: 5),
               child: Column(
@@ -271,7 +267,7 @@ class PantallaDetalleGallo extends StatelessWidget {
               ),
             ),
             const Divider(height: 20),
-            _filaPariente('Madre', _obtenerNombreMadre(context), FontAwesomeIcons.venus, Colors.pink),
+            _filaPariente('Madre', nombreMadre, FontAwesomeIcons.venus, Colors.pink),
             Padding(
               padding: const EdgeInsets.only(left: 30, top: 5),
               child: Column(
@@ -356,17 +352,16 @@ class PantallaDetalleGallo extends StatelessWidget {
                       urlString = 'https://$urlString'; 
                     }
                     final Uri url = Uri.parse(urlString);
+                    final messenger = ScaffoldMessenger.of(context);
                     try {
                       // mode: LaunchMode.externalApplication abre Youtube, Telegram, Chrome, etc.
                       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
                         throw 'No se pudo lanzar';
                       }
                     } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('No se pudo abrir el enlace: $urlString')),
-                        );
-                      }
+                      messenger.showSnackBar(
+                        SnackBar(content: Text('No se pudo abrir el enlace: $urlString')),
+                      );
                     }
                   },
                   // 🔥 CAMBIO DE ESTILO: AZUL CORPORATIVO Y ICONO MUNDIAL
@@ -405,9 +400,7 @@ class PantallaDetalleGallo extends StatelessWidget {
         ),
         child: Column(
           children: [
-            icon is IconData 
-                ? Icon(icon, color: const Color(0xFF1E3A8A), size: 20)
-                : FaIcon(icon, color: const Color(0xFF1E3A8A), size: 20),
+            IconoAdaptativo(icon, color: const Color(0xFF1E3A8A), size: 20),
             const SizedBox(height: 5),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -422,12 +415,10 @@ class PantallaDetalleGallo extends StatelessWidget {
       ),
     );
   }
-Widget _tituloSeccion(String titulo, dynamic icono) {
+  Widget _tituloSeccion(String titulo, dynamic icono) {
     return Row(
       children: [
-        icono is IconData 
-            ? Icon(icono, size: 18, color: const Color(0xFFD4AF37))
-            : FaIcon(icono, size: 18, color: const Color(0xFFD4AF37)),
+        IconoAdaptativo(icono, size: 18, color: const Color(0xFFD4AF37)),
         const SizedBox(width: 8),
         Text(titulo, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A))),
       ],
@@ -462,10 +453,7 @@ Widget _tituloSeccion(String titulo, dynamic icono) {
         CircleAvatar(
           radius: 12, 
           backgroundColor: colorIcono.withValues(alpha: 0.1), // Actualizado a withValues
-          // AQUÍ ESTÁ LA MAGIA PARA EL ÍCONO
-          child: icono is IconData 
-              ? Icon(icono, size: 14, color: colorIcono)
-              : FaIcon(icono, size: 14, color: colorIcono)
+          child: IconoAdaptativo(icono, size: 14, color: colorIcono),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -507,25 +495,5 @@ Widget _tituloSeccion(String titulo, dynamic icono) {
         ),
       ],
     );
-  }
-
-  String _obtenerNombrePadre(BuildContext context) {
-    if (gallo.nombrePadre != null && gallo.nombrePadre!.isNotEmpty) return gallo.nombrePadre!;
-    final padreId = gallo.padreId ?? gallo.idPadre;
-    if (padreId == null) return 'Desconocido';
-    try {
-      final padre = context.read<GallosProveedor>().obtenerGalloPorId(padreId);
-      return padre?.nombre ?? 'Desconocido';
-    } catch (_) { return 'Desconocido'; }
-  }
-
-  String _obtenerNombreMadre(BuildContext context) {
-    if (gallo.nombreMadre != null && gallo.nombreMadre!.isNotEmpty) return gallo.nombreMadre!;
-    final madreId = gallo.madreId ?? gallo.idMadre;
-    if (madreId == null) return 'Desconocido';
-    try {
-      final madre = context.read<GallosProveedor>().obtenerGalloPorId(madreId);
-      return madre?.nombre ?? 'Desconocido';
-    } catch (_) { return 'Desconocido'; }
   }
 }

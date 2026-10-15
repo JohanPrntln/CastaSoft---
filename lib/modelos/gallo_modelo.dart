@@ -1,6 +1,23 @@
+import 'dart:typed_data';
+
+import 'package:castasoft/modelos/foto_base64.dart';
+
 /// MODELO MAESTRO - CASTASOFT
 /// Contiene: Identificación + Genealogía Expandida + Salud + Finanzas + Multimedia
 class Gallo {
+  // ==================== CATÁLOGOS (FUENTE ÚNICA DE VERDAD) ====================
+  /// Valores válidos de [estado].
+  static const List<String> estadosValidos = ['Activo', 'Vendido', 'Baja', 'Retirado'];
+
+  /// Valores válidos de [etapaVida] (Sprint 1).
+  static const List<String> etapasVida = [
+    'Cría', 'Pollos crestones', 'Pollonas', 'Muda', 'Postura', 'Padrote', 'Madrilla', 'Combate',
+  ];
+
+  /// Etapas eliminadas en el Sprint 1. Los registros que aún las tengan se
+  /// marcan con el filtro '⚠️ Actualizar' para que el usuario las reasigne.
+  static const List<String> etapasLegadas = ['Levante', 'Descanso'];
+
   // ==================== 1. IDENTIFICACIÓN ====================
   final String id;
   final String? userId; // Dueño del gallo (Seguridad Nube)
@@ -20,10 +37,10 @@ class Gallo {
   final String? jaula;        // Ubicación física
 
   // ==================== 3. ESTADO Y GESTIÓN ====================
-  /// Estado general: 'Activo', 'Vendido', 'Baja', 'Retirado'
+  /// Estado general: uno de [estadosValidos].
   final String estado; 
   
-  /// [RECOMENDACIÓN] Etapa detallada: 'Cría', 'Levante', 'Muda', 'Postura/Cuido', 'Padrote'
+  /// Etapa detallada: uno de [etapasVida] (o de [etapasLegadas] en datos viejos).
   final String etapaVida; 
 
   // ==================== 4. GENEALOGÍA VISUAL (ÁRBOL COMPLETO) ====================
@@ -46,7 +63,13 @@ class Gallo {
   final String? notas;        // Observaciones generales
 
   // ==================== 6. MULTIMEDIA Y EXTRAS ====================
-  final String? fotoPath; // Ruta de la imagen principal
+  final String? fotoPath; // Foto principal como 'base64,...'
+
+  /// Bytes de la foto decodificados UNA sola vez (perezoso + memoizado).
+  /// La UI lee este campo en O(1) en vez de llamar `base64Decode` en `build()`,
+  /// y como la instancia de `Uint8List` es siempre la misma, `MemoryImage`
+  /// reutiliza la imagen ya decodificada del `ImageCache` entre frames.
+  late final Uint8List? fotoBytes = decodificarFotoBase64(fotoPath);
   
   /// [RECOMENDACIÓN] Link a video de YouTube/Drive para ver al gallo peleando/caminando
   final String? videoUrl; 
@@ -59,7 +82,8 @@ class Gallo {
 
 
   // === CONSTRUCTOR MAESTRO ===
-  const Gallo({
+  // (No es `const` porque [fotoBytes] es un campo `late final` memoizado.)
+  Gallo({
     required this.id,
     this.userId,
     required this.placa,
@@ -152,13 +176,14 @@ class Gallo {
       return null;
     }
 
+    // RN-07: nunca se aceptan strings vacíos dentro de vacunas/peleas
     List<String> toListString(dynamic val) {
-      if (val == null) return [];
-      if (val is List) {
-        // Convierte cada elemento a String a la fuerza para que no falle
-        return val.map((e) => e.toString()).toList();
-      }
-      return [];
+      if (val is! List) return [];
+      return val
+          .where((e) => e != null)
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
     }
 
     return Gallo(
@@ -167,9 +192,7 @@ class Gallo {
       placa: map['placa']?.toString() ?? '',
       nombre: map['nombre']?.toString() ?? '',
       sexo: map['sexo']?.toString() ?? 'Macho',
-      fechaNacimiento: map['fechaNacimiento'] != null 
-          ? DateTime.parse(map['fechaNacimiento'].toString()) 
-          : DateTime.now(),
+      fechaNacimiento: DateTime.tryParse(map['fechaNacimiento']?.toString() ?? '') ?? DateTime.now(),
       lineaGenetica: map['lineaGenetica']?.toString() ?? '',
       colorPluma: map['colorPluma']?.toString() ?? '',
       faseLunar: map['faseLunar']?.toString() ?? '',

@@ -1,5 +1,4 @@
-import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -13,13 +12,13 @@ import 'package:castasoft/pantallas/pantalla_formulario_cruce.dart';
 class PantallaDetalleCruce extends StatelessWidget {
   final CruceModelo cruce;
 
-  const PantallaDetalleCruce({Key? key, required this.cruce}) : super(key: key);
+  const PantallaDetalleCruce({super.key, required this.cruce});
 
   // FUNCIÓN PARA EXPANDIR LA FOTO
-  void _mostrarImagenGrande(BuildContext context, String base64String) {
+  void _mostrarImagenGrande(BuildContext context, Uint8List bytes) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.9),
+      barrierColor: Colors.black.withValues(alpha: 0.9),
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: EdgeInsets.zero,
@@ -31,7 +30,7 @@ class PantallaDetalleCruce extends StatelessWidget {
                 panEnabled: true,
                 minScale: 0.5,
                 maxScale: 4,
-                child: Image.memory(base64Decode(base64String), fit: BoxFit.contain),
+                child: Image.memory(bytes, fit: BoxFit.contain),
               ),
             ),
             SafeArea(
@@ -51,7 +50,8 @@ class PantallaDetalleCruce extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorTema = const Color(0xFF059669);
+    const colorTema = Color(0xFF059669);
+    final fotoBytes = cruce.fotoBytes; // Memoizada en el modelo: O(1)
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
@@ -62,14 +62,15 @@ class PantallaDetalleCruce extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () {
-              Navigator.push(
-                context,
+              final crucesProv = context.read<CrucesProveedor>();
+              final navigator = Navigator.of(context);
+              navigator.push(
                 MaterialPageRoute(
                   builder: (_) => PantallaFormularioCruce(cruceEditar: cruce),
                 ),
               ).then((_) {
-                context.read<CrucesProveedor>().cargarCruces();
-                if (context.mounted) Navigator.pop(context);
+                crucesProv.cargarCruces();
+                if (context.mounted) navigator.pop();
               });
             },
           )
@@ -81,23 +82,21 @@ class PantallaDetalleCruce extends StatelessWidget {
             // 1. FOTO GRANDE
             GestureDetector(
               onTap: () {
-                 if (cruce.fotoPath != null && cruce.fotoPath!.startsWith('base64')) {
-                   _mostrarImagenGrande(context, cruce.fotoPath!.split(',').last);
-                 }
+                 if (fotoBytes != null) _mostrarImagenGrande(context, fotoBytes);
               },
               child: Container(
                 width: double.infinity,
                 height: 250,
                 decoration: BoxDecoration(
                   color: Colors.grey.shade300,
-                  image: cruce.fotoPath != null && cruce.fotoPath!.startsWith('base64')
+                  image: fotoBytes != null
                       ? DecorationImage(
-                          image: MemoryImage(base64Decode(cruce.fotoPath!.split(',').last)),
+                          image: MemoryImage(fotoBytes),
                           fit: BoxFit.cover,
                         )
                       : null,
                 ),
-                child: cruce.fotoPath == null
+                child: fotoBytes == null
                     ? Icon(Icons.camera_alt, size: 60, color: Colors.grey.shade500)
                     : null,
               ),
@@ -231,7 +230,7 @@ class PantallaDetalleCruce extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
           child: LinearProgressIndicator(
             value: porcentaje,
-            backgroundColor: color.withOpacity(0.1),
+            backgroundColor: color.withValues(alpha: 0.1),
             color: color,
             minHeight: 10,
           ),

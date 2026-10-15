@@ -1,11 +1,15 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:io' show File;
 import 'package:flutter/foundation.dart';
 import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/servicios/servicio_firestore.dart'; 
 
 class GallosProveedor extends ChangeNotifier {
   List<Gallo> _gallos = [];
+  // Índice id -> Gallo para resolver padres/madres en O(1) desde la UI
+  Map<String, Gallo> _indicePorId = {};
+  // true cuando ya llegó al menos un snapshot (de servidor o de caché local)
+  bool _datosCargados = false;
   final ServicioFirestore _servicioFirestore = ServicioFirestore();
   StreamSubscription? _gallosSubscription;
   StreamSubscription? _authSubscription; 
@@ -21,6 +25,8 @@ class GallosProveedor extends ChangeNotifier {
         _iniciarEscuchaEnTiempoReal();
       } else {
         _gallos = [];
+        _indicePorId = {};
+        _datosCargados = false;
         _gallosSubscription?.cancel();
         notifyListeners();
       }
@@ -44,14 +50,16 @@ class GallosProveedor extends ChangeNotifier {
             }
             listaTemporal.add(Gallo.fromMap(data));
           } catch (error) {
-            print('🔴 ERROR cargando gallo ${doc.id}: $error');
+            debugPrint('🔴 ERROR cargando gallo ${doc.id}: $error');
           }
         }
         _gallos = listaTemporal;
+        _indicePorId = {for (final g in listaTemporal) g.id: g};
+        _datosCargados = true;
         notifyListeners();
       },
       onError: (error) {
-        print('⚠️ Error Firestore: $error');
+        debugPrint('⚠️ Error Firestore: $error');
       },
     );
   }
@@ -61,7 +69,7 @@ class GallosProveedor extends ChangeNotifier {
 
   // 🔥 NUEVO: Getter que revisa si hay gallos con etiquetas viejas
   bool get requiereActualizacionEtapa {
-    return _gallos.any((g) => g.etapaVida == 'Levante' || g.etapaVida == 'Descanso');
+    return _gallos.any((g) => Gallo.etapasLegadas.contains(g.etapaVida));
   }
 
   // Getter inteligente con TODOS los filtros
@@ -87,7 +95,7 @@ class GallosProveedor extends ChangeNotifier {
     if (_filtroEtapa != 'Todas') {
       if (_filtroEtapa == '⚠️ Actualizar') {
         // Trae los gallos huérfanos
-        resultado = resultado.where((gallo) => gallo.etapaVida == 'Levante' || gallo.etapaVida == 'Descanso').toList();
+        resultado = resultado.where((gallo) => Gallo.etapasLegadas.contains(gallo.etapaVida)).toList();
       } else {
         // Trae los normales
         resultado = resultado.where((gallo) => gallo.etapaVida == _filtroEtapa).toList();
@@ -150,49 +158,63 @@ class GallosProveedor extends ChangeNotifier {
   }
 
   // ==================== CRUD ====================
-  Future<void> crearGallo(Gallo nuevoGallo) async {
-    try {
-      final existe = await _servicioFirestore.validarPlacaDuplicada(nuevoGallo.placa);
-      if (existe) throw Exception('Ya existe un gallo con la placa ${nuevoGallo.placa}.');
-      await _servicioFirestore.crearGallo(nuevoGallo.toMap());
-    } catch (error) {
-      rethrow;
+  // Retornan `true` si el servidor confirmó la escritura, `false` si quedó en
+  // la caché local de Firestore pendiente de sincronizar (modo offline).
+
+  Future<bool> crearGallo(Gallo nuevoGallo) async {
+    if (await _placaEnUso(nuevoGallo.placa)) {
+      throw Exception('Ya existe un gallo con la placa ${nuevoGallo.placa}.');
     }
+    return _servicioFirestore.crearGallo(nuevoGallo.toMap());
   }
 
-  Future<void> actualizarGallo(Gallo galloEditado) async {
-    try {
-      final existe = await _servicioFirestore.validarPlacaDuplicada(
-        galloEditado.placa, idExcluir: galloEditado.id
-      );
-      if (existe) throw Exception('La placa ya está en uso.');
-      await _servicioFirestore.actualizarGallo(galloEditado.id, galloEditado.toMap());
-    } catch (error) {
-      rethrow;
+  Future<bool> actualizarGallo(Gallo galloEditado) async {
+    if (await _placaEnUso(galloEditado.placa, idExcluir: galloEditado.id)) {
+      throw Exception('La placa ya está en uso.');
     }
+    return _servicioFirestore.actualizarGallo(galloEditado.id, galloEditado.toMap());
   }
 
-  Future<void> eliminarGallo(String idGallo) async {
-    try {
-      final gallo = obtenerGalloPorId(idGallo);
-      if (gallo != null && gallo.fotoPath != null) {
-         final archivo = File(gallo.fotoPath!);
-         if (await archivo.exists()) await archivo.delete(); 
+  Future<bool> eliminarGallo(String idGallo) async {
+    final gallo = obtenerGalloPorId(idGallo);
+    final String? ruta = gallo?.fotoPath;
+    // Las fotos actuales viven dentro del documento ('base64,...'): se van con él.
+    // Solo se borra un archivo físico para rutas legadas en plataformas nativas
+    // (en Web `File` no existe y lanzaría UnsupportedError).
+    if (!kIsWeb && ruta != null && ruta.isNotEmpty && !ruta.startsWith('base64,')) {
+      try {
+        final archivo = File(ruta);
+        if (await archivo.exists()) await archivo.delete();
+      } catch (e) {
+        debugPrint('⚠️ No se pudo borrar la foto local $ruta: $e');
       }
-      await _servicioFirestore.eliminarGallo(idGallo);
-    } catch (error) {
-      rethrow;
     }
+    return _servicioFirestore.eliminarGallo(idGallo);
   }
 
-  Gallo? obtenerGalloPorId(String idGallo) {
-    try {
-      return _gallos.firstWhere((gallo) => gallo.id == idGallo);
-    } catch (e) { return null; }
+  Gallo? obtenerGalloPorId(String idGallo) => _indicePorId[idGallo];
+
+  /// Nombre a mostrar para un padre/madre: prioriza el texto desnormalizado
+  /// guardado en el gallo (RN-03) y, si falta, lo resuelve por id en O(1).
+  String resolverNombrePariente(String? nombreGuardado, String? idPariente) {
+    if (nombreGuardado != null && nombreGuardado.isNotEmpty) return nombreGuardado;
+    if (idPariente == null) return 'Desconocido';
+    return _indicePorId[idPariente]?.nombre ?? 'Desconocido';
   }
 
-  bool validarPlacaDuplicada(String placa) {
-    return _gallos.any((g) => g.placa.toLowerCase() == placa.toLowerCase());
+  /// RN-01 en memoria: `_gallos` es el espejo en tiempo real de Firestore
+  /// (incluye escrituras offline pendientes), así que no requiere red.
+  /// Comparación sin distinguir mayúsculas ni espacios extremos.
+  bool validarPlacaDuplicada(String placa, {String? idExcluir}) {
+    final buscada = placa.trim().toLowerCase();
+    return _gallos.any((g) => g.id != idExcluir && g.placa.trim().toLowerCase() == buscada);
+  }
+
+  Future<bool> _placaEnUso(String placa, {String? idExcluir}) async {
+    if (validarPlacaDuplicada(placa, idExcluir: idExcluir)) return true;
+    if (_datosCargados) return false;
+    // Aún no llega el primer snapshot: respaldo en Firestore (con fallback a caché)
+    return _servicioFirestore.validarPlacaDuplicada(placa, idExcluir: idExcluir);
   }
   
   Future<void> cargarGallos() async {}

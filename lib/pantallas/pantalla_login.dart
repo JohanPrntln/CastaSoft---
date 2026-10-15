@@ -5,9 +5,10 @@ import 'package:provider/provider.dart';
 import 'package:castasoft/servicios/servicio_firestore.dart';
 import 'package:castasoft/proveedores/usuario_proveedor.dart';
 import 'package:castasoft/pantallas/pantalla_configuracion_perfil.dart';
+import 'package:castasoft/componentes/icono_adaptativo.dart';
 
 class PantallaLogin extends StatefulWidget {
-  const PantallaLogin({Key? key}) : super(key: key);
+  const PantallaLogin({super.key});
 
   @override
   State<PantallaLogin> createState() => _PantallaLoginState();
@@ -198,7 +199,7 @@ class _PantallaLoginState extends State<PantallaLogin> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                             decoration: BoxDecoration(
-                              border: Border.all(color: _dorado.withOpacity(0.3)),
+                              border: Border.all(color: _dorado.withValues(alpha: 0.3)),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Row(
@@ -248,7 +249,7 @@ class _PantallaLoginState extends State<PantallaLogin> {
         fillColor: _grisOscuro,
         hintText: 'Usuario Asignado',
         hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-        prefixIcon: const FaIcon(FontAwesomeIcons.user, color: _dorado, size: 16),
+        prefixIcon: const IconoAdaptativo.prefijo(FontAwesomeIcons.user, color: _dorado, size: 16),
         errorText: _mensajeErrorUsuario,
         contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
@@ -267,7 +268,7 @@ class _PantallaLoginState extends State<PantallaLogin> {
         fillColor: _grisOscuro,
         hintText: 'Contraseña',
         hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-        prefixIcon: const FaIcon(FontAwesomeIcons.lock, color: _dorado, size: 16),
+        prefixIcon: const IconoAdaptativo.prefijo(FontAwesomeIcons.lock, color: _dorado, size: 16),
         suffixIcon: IconButton(
           icon: Icon(_mostrarContrasena ? Icons.visibility : Icons.visibility_off, color: Colors.grey, size: 18),
           onPressed: () => setState(() => _mostrarContrasena = !_mostrarContrasena),
@@ -291,7 +292,7 @@ class _PantallaLoginState extends State<PantallaLogin> {
           foregroundColor: Colors.black,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           elevation: 5,
-          shadowColor: _dorado.withOpacity(0.4),
+          shadowColor: _dorado.withValues(alpha: 0.4),
         ),
         child: _estaCargando
             ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2))

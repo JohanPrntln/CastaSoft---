@@ -1,5 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' show File;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -9,10 +10,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:castasoft/modelos/usuario_modelo.dart';
 import 'package:castasoft/proveedores/usuario_proveedor.dart';
 import 'package:castasoft/pantallas/pantalla_inicio.dart';
+import 'package:castasoft/componentes/icono_adaptativo.dart';
 
 class PantallaConfiguracionPerfil extends StatefulWidget {
   final UsuarioPerfil? perfilEditar; // 🔥 NUEVO: Recibe datos para editar
-  const PantallaConfiguracionPerfil({Key? key, this.perfilEditar}) : super(key: key);
+  const PantallaConfiguracionPerfil({super.key, this.perfilEditar});
 
   @override
   State<PantallaConfiguracionPerfil> createState() => _PantallaConfiguracionPerfilState();
@@ -28,7 +30,7 @@ class _PantallaConfiguracionPerfilState extends State<PantallaConfiguracionPerfi
   final _ctrlTelefono = TextEditingController();
   final _ctrlDireccion = TextEditingController();
 
-  File? _imagenSeleccionada;
+  XFile? _imagenSeleccionada; // XFile: funciona igual en Web y nativo
   String? _fotoActualBase64; // Para mostrar la vieja si no selecciona nueva
   bool _guardando = false;
 
@@ -53,12 +55,18 @@ class _PantallaConfiguracionPerfilState extends State<PantallaConfiguracionPerfi
       maxWidth: 400,
     );
     if (image != null) {
-      setState(() => _imagenSeleccionada = File(image.path));
+      setState(() => _imagenSeleccionada = image);
     }
   }
 
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // Se capturan antes de cualquier await (contexto asíncrono seguro)
+    final usuarioProv = context.read<UsuarioProveedor>();
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     setState(() => _guardando = true);
 
     try {
@@ -86,22 +94,24 @@ class _PantallaConfiguracionPerfilState extends State<PantallaConfiguracionPerfi
         logoPath: logoBase64,
       );
 
-      await context.read<UsuarioProveedor>().guardarPerfil(perfil);
+      final confirmado = await usuarioProv.guardarPerfil(perfil);
 
       if (mounted) {
         // Si venimos de editar, hacemos pop. Si es registro inicial, vamos a inicio.
         if (widget.perfilEditar != null) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Perfil actualizado correctamente')));
+          navigator.pop();
+          messenger.showSnackBar(SnackBar(content: Text(confirmado
+              ? 'Perfil actualizado correctamente'
+              : 'Perfil guardado sin conexión: se sincronizará al volver el internet')));
         } else {
-          Navigator.of(context).pushAndRemoveUntil(
+          navigator.pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const PantallaInicio()),
             (route) => false,
           );
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+      messenger.showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
@@ -110,6 +120,17 @@ class _PantallaConfiguracionPerfilState extends State<PantallaConfiguracionPerfi
   @override
   Widget build(BuildContext context) {
     bool esEdicion = widget.perfilEditar != null;
+
+    // Vista previa: XFile en Web (blob URL) o archivo nativo; si no, el logo
+    // guardado ya decodificado y memoizado en el modelo.
+    ImageProvider? vistaPrevia;
+    if (_imagenSeleccionada != null) {
+      vistaPrevia = kIsWeb
+          ? NetworkImage(_imagenSeleccionada!.path) as ImageProvider
+          : FileImage(File(_imagenSeleccionada!.path));
+    } else if (_fotoActualBase64 != null && widget.perfilEditar?.logoBytes != null) {
+      vistaPrevia = MemoryImage(widget.perfilEditar!.logoBytes!);
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -138,14 +159,12 @@ class _PantallaConfiguracionPerfilState extends State<PantallaConfiguracionPerfi
                     color: Colors.white,
                     shape: BoxShape.circle,
                     border: Border.all(color: const Color(0xFFD4AF37), width: 3),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)],
-                    image: _imagenSeleccionada != null
-                        ? DecorationImage(image: FileImage(_imagenSeleccionada!), fit: BoxFit.cover)
-                        : (_fotoActualBase64 != null && _fotoActualBase64!.startsWith('base64'))
-                            ? DecorationImage(image: MemoryImage(base64Decode(_fotoActualBase64!.split(',').last)), fit: BoxFit.cover)
-                            : null,
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)],
+                    image: vistaPrevia != null
+                        ? DecorationImage(image: vistaPrevia, fit: BoxFit.cover)
+                        : null,
                   ),
-                  child: _imagenSeleccionada == null && _fotoActualBase64 == null
+                  child: vistaPrevia == null
                       ? const Icon(Icons.add_a_photo, size: 40, color: Colors.grey)
                       : null,
                 ),
@@ -193,14 +212,12 @@ class _PantallaConfiguracionPerfilState extends State<PantallaConfiguracionPerfi
       keyboardType: isNumber ? TextInputType.phone : TextInputType.text,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: icon is IconData 
-            ? Icon(icon, color: const Color(0xFF1E3A8A), size: 18)
-            : FaIcon(icon, color: const Color(0xFF1E3A8A), size: 18),
+        prefixIcon: IconoAdaptativo.prefijo(icon, color: const Color(0xFF1E3A8A), size: 18),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
         fillColor: Colors.grey.shade50,
       ),
-      validator: requerido ? (v) => v!.isEmpty ? 'Requerido' : null : null,
+      validator: requerido ? (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null : null,
     );
   }
 }

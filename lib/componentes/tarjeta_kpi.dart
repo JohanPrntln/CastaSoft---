@@ -42,12 +42,12 @@ class TarjetaKPI extends StatelessWidget {
 
   /// Constructor del componente TarjetaKPI
   const TarjetaKPI({
-    Key? key,
+    super.key,
     required this.titulo,
     required this.valor,
     required this.colorFondo,
     this.icono,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

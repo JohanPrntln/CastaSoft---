@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
-import 'dart:convert';
 
 // Importaciones de tus archivos
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
 import 'package:castasoft/servicios/servicio_firestore.dart';
 import 'package:castasoft/componentes/tarjeta_gallo.dart';
+import 'package:castasoft/componentes/icono_adaptativo.dart';
 import 'package:castasoft/pantallas/pantalla_formulario_gallo.dart';
 import 'package:castasoft/pantallas/pantalla_detalle_gallo.dart';
 import 'package:castasoft/modelos/gallo_modelo.dart';
@@ -17,7 +17,7 @@ import 'package:castasoft/pantallas/pantalla_configuracion_perfil.dart';
 import 'package:castasoft/pantallas/pantalla_centro_seguridad.dart';
 
 class PantallaInicio extends StatefulWidget {
-  const PantallaInicio({Key? key}) : super(key: key);
+  const PantallaInicio({super.key});
 
   @override
   State<PantallaInicio> createState() => _PantallaInicioState();
@@ -33,9 +33,9 @@ class _PantallaInicioState extends State<PantallaInicio> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<GallosProveedor>().cargarGallos();
-      await context.read<UsuarioProveedor>().cargarPerfil();
+      context.read<UsuarioProveedor>().cargarPerfil();
     });
     _buscarController = TextEditingController();
   }
@@ -74,10 +74,10 @@ class _PantallaInicioState extends State<PantallaInicio> {
     );
 
     if (confirmar == true && mounted) {
-      await context.read<ServicioFirestore>().cerrarSesion();
-      if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-      }
+      final servicio = context.read<ServicioFirestore>();
+      final navigator = Navigator.of(context);
+      await servicio.cerrarSesion();
+      navigator.pushNamedAndRemoveUntil('/login', (route) => false);
     }
   }
 
@@ -185,7 +185,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
     final requiereAct = context.watch<GallosProveedor>().requiereActualizacionEtapa;
     
     // Lista con los nombres NUEVOS
-    List<String> etapas = ['Todas', 'Cría', 'Pollos crestones', 'Pollonas', 'Muda', 'Postura', 'Padrote', 'Madrilla', 'Combate'];
+    final List<String> etapas = ['Todas', ...Gallo.etapasVida];
     
     // Si hay gallos viejos, insertamos el chip rojo en la segunda posición
     if (requiereAct) {
@@ -198,7 +198,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 4, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 4)),
         ],
       ),
       child: ListView.separated(
@@ -235,11 +235,11 @@ class _PantallaInicioState extends State<PantallaInicio> {
               if (selected && esAdvertencia) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: const Row(
+                    content: Row(
                       children: [
-                        Icon(Icons.info_outline, color: Colors.white),
-                        SizedBox(width: 10),
-                        Expanded(child: Text('Las etapas "Levante" y "Descanso" se han cambiado. Por favor, edita estos animales y asígnales una nueva etapa.')),
+                        const Icon(Icons.info_outline, color: Colors.white),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text('Las etapas "${Gallo.etapasLegadas.join('" y "')}" se han cambiado. Por favor, edita estos animales y asígnales una nueva etapa.')),
                       ],
                     ),
                     backgroundColor: Colors.red.shade800,
@@ -296,7 +296,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                 ),
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
-                  BoxShadow(color: const Color(0xFF1E3A8A).withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4)),
+                  BoxShadow(color: const Color(0xFF1E3A8A).withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4)),
                 ],
               ),
               child: Column(
@@ -317,7 +317,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                       ),
                       Container(
                         padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
                         // CAMBIO DE ICONO: Pluma en vez de KiwiBird
                         child: const FaIcon(FontAwesomeIcons.featherPointed, color: Colors.white, size: 24),
                       ),
@@ -353,7 +353,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                 ),
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
-                  BoxShadow(color: const Color(0xFFD4AF37).withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4)),
+                  BoxShadow(color: const Color(0xFFD4AF37).withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4)),
                 ],
               ),
               child: Row(
@@ -362,7 +362,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Total Vendidos', style: GoogleFonts.poppins(color: Colors.white.withOpacity(0.9), fontSize: 14)),
+                      Text('Total Vendidos', style: GoogleFonts.poppins(color: Colors.white.withValues(alpha: 0.9), fontSize: 14)),
                       Text(
                         '${estadisticasGenerales['vendidos']}',
                         style: GoogleFonts.poppins(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
@@ -371,7 +371,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                   ),
                   Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
                     child: const FaIcon(FontAwesomeIcons.sackDollar, color: Colors.white, size: 24),
                   ),
                 ],
@@ -386,9 +386,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
   Widget _buildMiniDato(String label, String valor, dynamic icono) {
     return Column(
       children: [
-        icono is IconData 
-            ? Icon(icono, color: Colors.white70, size: 14)
-            : FaIcon(icono, color: Colors.white70, size: 14),
+        IconoAdaptativo(icono, color: Colors.white70, size: 14),
         const SizedBox(height: 4),
         Text(valor, style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
         Text(label, style: GoogleFonts.poppins(color: Colors.white54, fontSize: 10)),
@@ -407,7 +405,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
         decoration: BoxDecoration(
           gradient: const LinearGradient(colors: [Color(0xFF059669), Color(0xFF34D399)], begin: Alignment.topLeft, end: Alignment.bottomRight),
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: const Color(0xFF059669).withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: const Color(0xFF059669).withValues(alpha: 0.4), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Row(
           children: [
@@ -424,7 +422,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
             const SizedBox(width: 15),
             Container(
               padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
               child: const FaIcon(FontAwesomeIcons.dna, color: Colors.white, size: 24),
             ),
           ],
@@ -460,7 +458,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2))],
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2))],
                 ),
                 child: Center(
                   child: Column(
@@ -485,12 +483,11 @@ class _PantallaInicioState extends State<PantallaInicio> {
                     onTap: () => _navegarADetalleGallo(context, gallo),
                     child: TarjetaGallo(
                       gallo: gallo,
-                      onEdit: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => PantallaFormularioGallo(galloEditar: gallo)),
-                        ).then((_) => context.read<GallosProveedor>().cargarGallos());
-                      },
+                      // La lista se actualiza sola por el stream en tiempo real
+                      onEdit: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => PantallaFormularioGallo(galloEditar: gallo)),
+                      ),
                       onDelete: () => _mostrarConfirmacionEliminar(context, gallo),
                     ),
                   );
@@ -555,15 +552,11 @@ class _PantallaInicioState extends State<PantallaInicio> {
           );
         }
 
-        Widget widgetLogo;
-        if (perfil?.logoPath != null && perfil!.logoPath!.startsWith('base64,')) {
-          try {
-            final bytes = base64Decode(perfil.logoPath!.split(',').last);
-            widgetLogo = ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.memory(bytes, height: 45, width: 45, fit: BoxFit.cover));
-          } catch (e) { widgetLogo = _logoIcono(); }
-        } else {
-          widgetLogo = _logoIcono();
-        }
+        // Logo memoizado en el modelo: no se decodifica Base64 en cada rebuild
+        final logoBytes = perfil?.logoBytes;
+        final Widget widgetLogo = logoBytes != null
+            ? ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.memory(logoBytes, height: 45, width: 45, fit: BoxFit.cover, gaplessPlayback: true))
+            : _logoIcono();
 
         return InkWell(
           onTap: abrirMenuPerfil, // 🔥 Ahora abre el menú en vez de ir directo a editar
@@ -592,7 +585,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
   }
 
   Widget _buildBuscador({required double ancho}) {
-    return Container(
+    return SizedBox(
       width: ancho,
       height: 40,
       child: TextField(
@@ -600,7 +593,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
         decoration: InputDecoration(
           hintText: 'Buscar placa, nombre...',
           hintStyle: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade400),
-          prefixIcon: const FaIcon(FontAwesomeIcons.magnifyingGlass, size: 14, color: Colors.grey),
+          prefixIcon: const IconoAdaptativo.prefijo(FontAwesomeIcons.magnifyingGlass, size: 14, color: Colors.grey),
           contentPadding: const EdgeInsets.symmetric(vertical: 0),
           filled: true,
           fillColor: Colors.grey.shade100,
@@ -621,7 +614,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
           value: _filtroEstadoSeleccionado,
           icon: const Icon(Icons.filter_list, size: 18, color: Colors.grey),
           style: GoogleFonts.poppins(fontSize: 12, color: Colors.black87),
-          items: ['Todos', 'Activo', 'Vendido', 'Retirado'].map((String value) => DropdownMenuItem<String>(value: value, child: Text(value))).toList(),
+          items: ['Todos', ...Gallo.estadosValidos].map((String value) => DropdownMenuItem<String>(value: value, child: Text(value))).toList(),
           onChanged: (val) {
             context.read<GallosProveedor>().setFiltroEstado(val ?? 'Todos');
             setState(() => _filtroEstadoSeleccionado = val ?? 'Todos');
@@ -648,14 +641,18 @@ class _PantallaInicioState extends State<PantallaInicio> {
       context,
       MaterialPageRoute(builder: (context) => PantallaDetalleGallo(gallo: gallo)),
     );
-    if (resultado == 'editar' && mounted) {
-      Navigator.push(context, MaterialPageRoute(builder: (context) => PantallaFormularioGallo(galloEditar: gallo))).then((_) => context.read<GallosProveedor>().cargarGallos());
-    } else if (resultado == 'eliminar' && mounted) {
+    if (!context.mounted) return;
+    if (resultado == 'editar') {
+      Navigator.push(context, MaterialPageRoute(builder: (context) => PantallaFormularioGallo(galloEditar: gallo)));
+    } else if (resultado == 'eliminar') {
       _mostrarConfirmacionEliminar(context, gallo);
     }
   }
 
   Future<void> _mostrarConfirmacionEliminar(BuildContext context, Gallo gallo) async {
+    // Se capturan antes de cualquier await (contexto asíncrono seguro)
+    final gallosProv = context.read<GallosProveedor>();
+    final messenger = ScaffoldMessenger.of(context);
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -670,10 +667,15 @@ class _PantallaInicioState extends State<PantallaInicio> {
 
     if (confirmar == true) {
       try {
-        await context.read<GallosProveedor>().eliminarGallo(gallo.id);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Eliminado correctamente'), backgroundColor: Colors.green));
+        final confirmado = await gallosProv.eliminarGallo(gallo.id);
+        messenger.showSnackBar(SnackBar(
+          content: Text(confirmado
+              ? 'Eliminado correctamente'
+              : 'Eliminado sin conexión: se sincronizará al volver el internet'),
+          backgroundColor: confirmado ? Colors.green : Colors.orange.shade800,
+        ));
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+        messenger.showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
       }
     }
   }
@@ -682,7 +684,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
     return Container(
       width: 45, height: 45,
       padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(color: const Color(0xFF1E3A8A).withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: const Color(0xFF1E3A8A).withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12)),
       child: const FaIcon(FontAwesomeIcons.houseUser, color: Color(0xFF1E3A8A), size: 20),
     );
   }

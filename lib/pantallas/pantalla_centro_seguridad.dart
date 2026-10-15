@@ -9,7 +9,7 @@ import 'package:castasoft/proveedores/cruces_proveedor.dart';
 import 'package:castasoft/servicios/servicio_backup.dart';
 
 class PantallaCentroSeguridad extends StatefulWidget {
-  const PantallaCentroSeguridad({Key? key}) : super(key: key);
+  const PantallaCentroSeguridad({super.key});
 
   @override
   State<PantallaCentroSeguridad> createState() => _PantallaCentroSeguridadState();
@@ -110,6 +110,13 @@ class _PantallaCentroSeguridadState extends State<PantallaCentroSeguridad> {
 
     if (!confirmar) return;
 
+    if (!mounted) return;
+    // Se capturan antes de cualquier await (contexto asíncrono seguro)
+    final usuarioProv = context.read<UsuarioProveedor>();
+    final gallosProv = context.read<GallosProveedor>();
+    final crucesProv = context.read<CrucesProveedor>();
+    final messenger = ScaffoldMessenger.of(context);
+
     setState(() => _cargandoRestauracion = true);
 
     try {
@@ -119,11 +126,11 @@ class _PantallaCentroSeguridadState extends State<PantallaCentroSeguridad> {
       
       // 🔥 Recargamos todos los proveedores para que la pantalla principal se actualice sola
       if (mounted) {
-        await context.read<UsuarioProveedor>().cargarPerfil();
-        await context.read<GallosProveedor>().cargarGallos();
-        await context.read<CrucesProveedor>().cargarCruces();
+        await usuarioProv.cargarPerfil();
+        await gallosProv.cargarGallos();
+        await crucesProv.cargarCruces();
         
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: const Text('¡Criadero restaurado con éxito! Los datos ya están en la nube.', style: TextStyle(fontWeight: FontWeight.bold)),
             backgroundColor: Colors.blue.shade700,

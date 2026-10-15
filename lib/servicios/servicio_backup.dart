@@ -7,10 +7,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/modelos/cruce_modelo.dart';
 import 'package:castasoft/modelos/usuario_modelo.dart';
+import 'package:castasoft/servicios/servicio_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:typed_data'; 
 
 class ServicioBackup {
+  // Límites de Firestore por commit: 500 operaciones y ~10 MiB de payload.
+  // Se deja margen porque las fotos Base64 viajan dentro de cada documento.
+  static const int _maxOperacionesPorLote = 450;
+  static const int _maxBytesPorLote = 8 * 1024 * 1024;
+
+  /// Campos que referencian a otro gallo (incluye nombres legados).
+  static const List<String> _camposReferenciaGallo = ['padreId', 'madreId', 'idPadre', 'idMadre'];
+
   // ==========================================
   // 1. EXPORTAR DATOS A JSON (ADAPTADO PARA WEB Y ESCRITORIO)
   // ==========================================
@@ -29,7 +38,7 @@ class ServicioBackup {
           // 🔥 Evitamos leer el Platform en la web para que no explote
           'plataforma_origen': kIsWeb ? 'Web' : Platform.operatingSystem,
         },
-        'perfil': perfil != null ? perfil.toMap() : null,
+        'perfil': perfil?.toMap(),
         'gallos': gallos.map((g) => g.toMap()).toList(),
         'cruces': cruces.map((c) => c.toMap()).toList(),
       };
@@ -91,67 +100,92 @@ class ServicioBackup {
       final Map<String, dynamic> backupData = jsonDecode(jsonString);
 
       final FirebaseFirestore firestore = FirebaseFirestore.instance;
-      final WriteBatch batch = firestore.batch();
+
+      // Escrituras pendientes: se reparten luego en uno o más WriteBatch.
+      final List<MapEntry<DocumentReference<Map<String, dynamic>>, Map<String, dynamic>>> escrituras = [];
 
       // 🔥 DICCIONARIO DE CLONACIÓN PARA NO ROMPER LA GENÉTICA
       // Guardaremos la relación: { "id_viejo" : "id_nuevo" }
-      Map<String, String> mapaIdsGallos = {};
+      final Map<String, String> mapaIdsGallos = {};
 
       // --- RESTAURAR PERFIL ---
-      if (backupData['perfil'] != null) {
-        final Map<String, dynamic> perfilData = backupData['perfil'];
+      if (backupData['perfil'] is Map) {
+        final Map<String, dynamic> perfilData = Map<String, dynamic>.from(backupData['perfil']);
         perfilData['id'] = nuevoUid; 
-        perfilData['uid'] = nuevoUid; // 🔥 Agregamos esta línea para reescribir el campo fantasma
-        
-        final docRef = firestore.collection('usuarios').doc(nuevoUid);
-        batch.set(docRef, perfilData);
+        perfilData['uid'] = nuevoUid; // 🔥 Reescribe el campo fantasma con el UID activo
+        escrituras.add(MapEntry(firestore.collection('usuarios').doc(nuevoUid), perfilData));
       }
 
-      // --- RESTAURAR GALLOS (CREANDO IDs NUEVOS) ---
-      if (backupData['gallos'] != null) {
-        final List<dynamic> gallosData = backupData['gallos'];
-        for (var gallo in gallosData) {
-          final String idViejo = gallo['id'];
-          
-          // Generamos una referencia con un ID 100% nuevo y en blanco en Firebase
-          final docRef = firestore.collection('gallos').doc();
-          final String idNuevo = docRef.id;
-          
-          // Guardamos en el diccionario
-          mapaIdsGallos[idViejo] = idNuevo;
+      final List<Map<String, dynamic>> gallosData = (backupData['gallos'] as List? ?? const [])
+          .whereType<Map>()
+          .map((g) => Map<String, dynamic>.from(g))
+          .toList();
+      final List<Map<String, dynamic>> crucesData = (backupData['cruces'] as List? ?? const [])
+          .whereType<Map>()
+          .map((c) => Map<String, dynamic>.from(c))
+          .toList();
 
-          // Actualizamos los datos del gallo antes de subirlo
-          gallo['id'] = idNuevo; 
-          gallo['userId'] = nuevoUid; 
-          
-          batch.set(docRef, gallo);
+      // --- PASADA 1: IDs NUEVOS PARA TODOS LOS GALLOS ---
+      // Debe completarse ANTES de escribir, porque un gallo puede referenciar
+      // como padre/madre a otro que aparece más adelante en el archivo.
+      final List<DocumentReference<Map<String, dynamic>>> refsGallos = [];
+      for (final gallo in gallosData) {
+        final docRef = firestore.collection('gallos').doc(); // ID nuevo, generado localmente
+        refsGallos.add(docRef);
+        final String? idViejo = gallo['id']?.toString();
+        if (idViejo != null && idViejo.isNotEmpty) mapaIdsGallos[idViejo] = docRef.id;
+      }
+
+      // Reconecta padreId/madreId de un gallo o cruce usando el diccionario
+      void revincular(Map<String, dynamic> datos) {
+        for (final campo in _camposReferenciaGallo) {
+          final String? idViejo = datos[campo]?.toString();
+          if (idViejo != null && mapaIdsGallos.containsKey(idViejo)) {
+            datos[campo] = mapaIdsGallos[idViejo];
+          }
         }
       }
 
-      // --- RESTAURAR CRUCES (RECONECTANDO LA GENÉTICA) ---
-      if (backupData['cruces'] != null) {
-        final List<dynamic> crucesData = backupData['cruces'];
-        for (var cruce in crucesData) {
-          // Generamos ID nuevo para el cruce
-          final docRef = firestore.collection('cruces').doc();
-          
-          cruce['id'] = docRef.id; 
-          cruce['userId'] = nuevoUid; 
-
-          // 🔥 MAGIA: Reconectamos al Padre y a la Madre usando el diccionario
-          if (cruce['padreId'] != null && mapaIdsGallos.containsKey(cruce['padreId'])) {
-            cruce['padreId'] = mapaIdsGallos[cruce['padreId']];
-          }
-          if (cruce['madreId'] != null && mapaIdsGallos.containsKey(cruce['madreId'])) {
-            cruce['madreId'] = mapaIdsGallos[cruce['madreId']];
-          }
-
-          batch.set(docRef, cruce);
-        }
+      // --- PASADA 2: GALLOS (ID nuevo + dueño activo + genealogía re-vinculada) ---
+      for (var i = 0; i < gallosData.length; i++) {
+        final gallo = gallosData[i];
+        gallo['id'] = refsGallos[i].id;
+        gallo['userId'] = nuevoUid; // RN-05
+        revincular(gallo);
+        escrituras.add(MapEntry(refsGallos[i], gallo));
       }
 
-      // 5. Enviar a la nube (Todo el clonaje de una sola vez)
-      await batch.commit();
+      // --- CRUCES (RECONECTANDO LA GENÉTICA) ---
+      for (final cruce in crucesData) {
+        final docRef = firestore.collection('cruces').doc();
+        cruce['id'] = docRef.id; 
+        cruce['userId'] = nuevoUid; 
+        revincular(cruce); // 🔥 MAGIA: Padre y Madre apuntan a los gallos clonados
+        escrituras.add(MapEntry(docRef, cruce));
+      }
+
+      // 5. Enviar a la nube con WriteBatch. Si todo cabe en un lote (caso
+      //    normal) la restauración es atómica; si excede los límites de
+      //    Firestore se divide en lotes atómicos consecutivos.
+      WriteBatch lote = firestore.batch();
+      int operaciones = 0;
+      int bytes = 0;
+      for (final escritura in escrituras) {
+        final int tamano = jsonEncode(escritura.value).length;
+        if (operaciones > 0 &&
+            (operaciones >= _maxOperacionesPorLote || bytes + tamano > _maxBytesPorLote)) {
+          await ServicioFirestore.confirmarEscritura(lote.commit());
+          lote = firestore.batch();
+          operaciones = 0;
+          bytes = 0;
+        }
+        lote.set(escritura.key, escritura.value);
+        operaciones++;
+        bytes += tamano;
+      }
+      if (operaciones > 0) {
+        await ServicioFirestore.confirmarEscritura(lote.commit());
+      }
 
     } catch (e) {
       throw Exception('Error al restaurar: $e');

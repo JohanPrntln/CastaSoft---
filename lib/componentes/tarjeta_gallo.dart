@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -12,13 +11,13 @@ class TarjetaGallo extends StatelessWidget {
   final VoidCallback? onPedigree; 
 
   const TarjetaGallo({
-    Key? key,
+    super.key,
     required this.gallo,
     this.onTap,
     this.onEdit,
     this.onDelete,
     this.onPedigree,
-  }) : super(key: key);
+  });
 
   // --- LÓGICA DE EDAD ---
   String _calcularEdadBonita(DateTime nacimiento) {
@@ -43,7 +42,7 @@ class TarjetaGallo extends StatelessWidget {
   void _mostrarImagenGrande(BuildContext context, ImageProvider imagen) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.9),
+      barrierColor: Colors.black.withValues(alpha: 0.9),
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: EdgeInsets.zero,
@@ -78,15 +77,20 @@ class TarjetaGallo extends StatelessWidget {
     Widget widgetImagen;
     ImageProvider? proveedorImagen;
 
-    if (gallo.fotoPath != null && gallo.fotoPath!.startsWith('base64,')) {
-      try {
-        final String base64String = gallo.fotoPath!.split(',').last;
-        final bytes = base64Decode(base64String);
-        proveedorImagen = MemoryImage(bytes);
-        widgetImagen = Image.memory(bytes, fit: BoxFit.cover);
-      } catch (e) {
-        widgetImagen = const Icon(Icons.broken_image, color: Colors.grey);
-      }
+    // O(1): los bytes ya vienen decodificados y memoizados en el modelo.
+    // Al ser siempre la misma instancia de Uint8List, MemoryImage reutiliza
+    // la imagen del ImageCache y el scroll no vuelve a decodificar nada.
+    final bytes = gallo.fotoBytes;
+    if (bytes != null) {
+      proveedorImagen = MemoryImage(bytes);
+      widgetImagen = Image(
+        image: proveedorImagen,
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.grey),
+      );
+    } else if (gallo.fotoPath != null && gallo.fotoPath!.startsWith('base64')) {
+      widgetImagen = const Icon(Icons.broken_image, color: Colors.grey);
     } else {
       widgetImagen = const FaIcon(FontAwesomeIcons.kiwiBird, size: 30, color: Color(0xFF1E3A8A));
     }

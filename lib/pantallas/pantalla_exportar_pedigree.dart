@@ -1,5 +1,4 @@
-import 'dart:convert';
-import 'dart:io';
+import 'dart:io' show Directory, File, Platform;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:screenshot/screenshot.dart';
@@ -16,11 +15,12 @@ import 'package:castasoft/modelos/usuario_modelo.dart';
 import 'package:castasoft/proveedores/usuario_proveedor.dart';
 import 'package:gal/gal.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:castasoft/componentes/icono_adaptativo.dart';
 
 class PantallaExportarPedigree extends StatefulWidget {
   final Gallo gallo;
 
-  const PantallaExportarPedigree({Key? key, required this.gallo}) : super(key: key);
+  const PantallaExportarPedigree({super.key, required this.gallo});
 
   @override
   State<PantallaExportarPedigree> createState() => _PantallaExportarPedigreeState();
@@ -62,8 +62,8 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
     {'nombre': '🇵🇦 PAN', 'codigo': '507'},
   ];
 
-  File? _logoPersonalizado;
-  String? _logoUsuarioBase64;
+  XFile? _logoPersonalizado; // XFile: compatible con Web (CLAUDE.md, zona 2)
+  Uint8List? _logoUsuarioBytes; // Logo del perfil ya decodificado (memoizado)
   bool _cargando = false;
 
   @override
@@ -87,7 +87,7 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
 
     String nombreCastaderoPerfil = usuario?.nombreCastadero ?? 'Mi Criadero'; 
     _criaderoCtrl = TextEditingController(text: widget.gallo.criaderoOrigen.isEmpty ? nombreCastaderoPerfil : widget.gallo.criaderoOrigen);
-    _logoUsuarioBase64 = usuario?.logoPath;
+    _logoUsuarioBytes = usuario?.logoBytes;
 
     // 3. Genealogía
     _padreCtrl = TextEditingController(text: widget.gallo.nombrePadre ?? 'Desconocido');
@@ -122,7 +122,7 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
   Future<void> _cambiarLogo() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 500); 
     if (image != null) {
-      setState(() => _logoPersonalizado = File(image.path));
+      setState(() => _logoPersonalizado = image);
     }
   }
 
@@ -255,7 +255,7 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
                             children: [
                               GestureDetector(onTap: _cambiarLogo, child: _construirLogoCriadero(90)),
                               const SizedBox(width: 20),
-                              Container(
+                              SizedBox(
                                 width: 180, 
                                 child: Text(
                                   _criaderoCtrl.text.toUpperCase(), 
@@ -456,9 +456,7 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
         decoration: InputDecoration(
           labelText: label, 
           prefixIcon: icon != null 
-              ? (icon is IconData 
-                  ? Icon(icon, size: 20, color: Colors.grey.shade600) 
-                  : FaIcon(icon, size: 20, color: Colors.grey.shade600)) 
+              ? IconoAdaptativo.prefijo(icon, size: 20, color: Colors.grey.shade600)
               : null, 
           isDense: true, 
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), 
@@ -525,8 +523,13 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
 
   Widget _construirLogoCriadero(double size) {
     ImageProvider? imagen;
-    if (_logoPersonalizado != null) { imagen = FileImage(_logoPersonalizado!); } 
-    else if (_logoUsuarioBase64 != null && _logoUsuarioBase64!.isNotEmpty) { try { imagen = MemoryImage(base64Decode(_logoUsuarioBase64!.split(',').last)); } catch (e) { /* Error */ } }
+    if (_logoPersonalizado != null) {
+      imagen = kIsWeb
+          ? NetworkImage(_logoPersonalizado!.path) as ImageProvider
+          : FileImage(File(_logoPersonalizado!.path));
+    } else if (_logoUsuarioBytes != null) {
+      imagen = MemoryImage(_logoUsuarioBytes!);
+    }
     
     return Container(
       width: size, height: size, 
@@ -534,8 +537,8 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
         shape: BoxShape.circle, 
         border: Border.all(color: const Color(0xFFD4AF37), width: 3), 
         image: imagen != null ? DecorationImage(image: imagen, fit: BoxFit.cover) : null,
-        color: imagen == null ? Colors.white.withOpacity(0.9) : null,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(2, 2))]
+        color: imagen == null ? Colors.white.withValues(alpha: 0.9) : null,
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 8, offset: const Offset(2, 2))]
       ),
       child: imagen == null ? const FaIcon(FontAwesomeIcons.crown, color: Color(0xFFD4AF37), size: 40) : null,
     );
@@ -543,7 +546,8 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
 
   Widget _construirFotoGallo(double w, double h) {
     ImageProvider? imagen;
-    if (widget.gallo.fotoPath != null && widget.gallo.fotoPath!.startsWith('base64,')) { try { imagen = MemoryImage(base64Decode(widget.gallo.fotoPath!.split(',').last)); } catch (e) { /* Error */ } }
+    final bytes = widget.gallo.fotoBytes; // Memoizada en el modelo: O(1)
+    if (bytes != null) imagen = MemoryImage(bytes);
     return Container(width: w, height: h, decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(4), image: imagen != null ? DecorationImage(image: imagen, fit: BoxFit.cover) : null, border: Border.all(color: const Color(0xFFD4AF37), width: 1.5)), child: imagen == null ? Icon(Icons.camera_alt, color: Colors.grey.shade400) : null);
   }
 

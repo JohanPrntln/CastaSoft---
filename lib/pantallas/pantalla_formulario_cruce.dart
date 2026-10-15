@@ -1,5 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' show File;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -10,13 +11,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
+import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/modelos/cruce_modelo.dart';
 import 'package:castasoft/proveedores/cruces_proveedor.dart';
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
+import 'package:castasoft/componentes/icono_adaptativo.dart';
 
 class PantallaFormularioCruce extends StatefulWidget {
   final CruceModelo? cruceEditar; 
-  const PantallaFormularioCruce({Key? key, this.cruceEditar}) : super(key: key);
+  const PantallaFormularioCruce({super.key, this.cruceEditar});
 
   @override
   State<PantallaFormularioCruce> createState() => _PantallaFormularioCruceState();
@@ -55,9 +58,12 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
     'Sin Marca / Otro'
   ];
 
+  static const List<String> _fasesLunares = ['Creciente', 'Menguante', 'Llena', 'Nueva'];
+
   DateTime _fechaSeleccionada = DateTime.now();
   XFile? _imagenNueva;
   String? _fotoActualBase64; 
+  Uint8List? _fotoActualBytes; // Decodificada una sola vez (memoizada en el modelo)
   bool _guardando = false;
   bool _esEdicion = false;
 
@@ -89,14 +95,19 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
       _pataMarca = c.pataMarca;
     } else {
       // Manejo de compatibilidad con versiones viejas (que decían solo 'Izquierda' o 'Derecha')
-      if (c.pataMarca == 'Izquierda') _pataMarca = 'Pata Izquierda';
-      else if (c.pataMarca == 'Derecha') _pataMarca = 'Pata Derecha';
-      else _pataMarca = 'Sin Marca / Otro';
+      if (c.pataMarca == 'Izquierda') {
+        _pataMarca = 'Pata Izquierda';
+      } else if (c.pataMarca == 'Derecha') {
+        _pataMarca = 'Pata Derecha';
+      } else {
+        _pataMarca = 'Sin Marca / Otro';
+      }
     }
 
     _ctrlMarca.text = c.detalleMarca;
     _ctrlNotas.text = c.notas ?? '';
     _fotoActualBase64 = c.fotoPath;
+    _fotoActualBytes = c.fotoBytes;
   }
 
   Future<void> _seleccionarFoto() async {
@@ -113,50 +124,48 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
     setState(() {
       _imagenNueva = null;
       _fotoActualBase64 = null;
+      _fotoActualBytes = null;
     });
   }
 
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_padreId == null || _madreId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selecciona Padre y Madre')));
+
+    final int total = int.tryParse(_ctrlCantidad.text.trim()) ?? 0;
+    final int muertos = int.tryParse(_ctrlMuertos.text.trim()) ?? 0;
+    final int machos = int.tryParse(_ctrlMachos.text.trim()) ?? 0;
+    final int hembras = int.tryParse(_ctrlHembras.text.trim()) ?? 0;
+
+    // RN-02 (coherencia biológica) + RN-04 (progenitores obligatorios)
+    final String? errorReglas = CruceModelo.validarReglasNegocio(
+      padreId: _padreId,
+      madreId: _madreId,
+      cantidadHuevos: total,
+      pollitosMuertos: muertos,
+      pollitosMachos: machos,
+      pollitosHembras: hembras,
+    );
+    if (errorReglas != null) {
+      _mostrarError(errorReglas);
       return;
     }
 
-    int total = int.tryParse(_ctrlCantidad.text) ?? 0;
-    int muertos = int.tryParse(_ctrlMuertos.text) ?? 0;
-    int machos = int.tryParse(_ctrlMachos.text) ?? 0;
-    int hembras = int.tryParse(_ctrlHembras.text) ?? 0;
+    final int vivos = total - muertos;
 
-    if (muertos > total) {
-      _mostrarError('No pueden haber más muertos ($muertos) que el total ($total)');
-      return;
-    }
-
-    int vivos = total - muertos;
-    int sumaSexados = machos + hembras;
-    
-    if (sumaSexados > vivos) {
-      _mostrarError('Error: Tienes $vivos vivos, pero $sumaSexados sexados ($machos M + $hembras H).');
-      return;
-    }
+    // Se capturan ANTES de cualquier await (contexto asíncrono seguro)
+    final gallosProv = context.read<GallosProveedor>();
+    final crucesProv = context.read<CrucesProveedor>();
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
 
     setState(() => _guardando = true);
 
     try {
-      final gallosProv = context.read<GallosProveedor>();
-      String nombreP = 'Desconocido';
-      String nombreM = 'Desconocida';
-      
-      try {
-        final padre = gallosProv.gallos.firstWhere((g) => g.id == _padreId);
-        nombreP = padre.nombre;
-      } catch (_) { if(_esEdicion) nombreP = widget.cruceEditar!.nombrePadre; }
-
-      try {
-        final madre = gallosProv.gallos.firstWhere((g) => g.id == _madreId);
-        nombreM = madre.nombre;
-      } catch (_) { if(_esEdicion) nombreM = widget.cruceEditar!.nombreMadre; }
+      // RN-03: nombres desnormalizados (se conservan aunque se borre el ancestro)
+      final String nombreP = gallosProv.obtenerGalloPorId(_padreId!)?.nombre
+          ?? (_esEdicion ? widget.cruceEditar!.nombrePadre : 'Desconocido');
+      final String nombreM = gallosProv.obtenerGalloPorId(_madreId!)?.nombre
+          ?? (_esEdicion ? widget.cruceEditar!.nombreMadre : 'Desconocida');
 
       final user = FirebaseAuth.instance.currentUser;
 
@@ -171,7 +180,7 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
 
       final cruceModelo = CruceModelo(
         id: _esEdicion ? widget.cruceEditar!.id : const Uuid().v4(),
-        userId: _esEdicion ? widget.cruceEditar!.userId : user!.uid,
+        userId: _esEdicion ? widget.cruceEditar!.userId : user?.uid ?? '', // El proveedor reinyecta el UID activo (RN-05)
         padreId: _padreId!,
         nombrePadre: nombreP,
         madreId: _madreId!,
@@ -189,15 +198,20 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
         notas: _ctrlNotas.text.trim(),
       );
 
-      if (_esEdicion) {
-        await context.read<CrucesProveedor>().actualizarCruce(cruceModelo);
-      } else {
-        await context.read<CrucesProveedor>().agregarCruce(cruceModelo);
-      }
-      
-      if (mounted) Navigator.pop(context);
+      // Sin red responde en <= 2.5 s con `confirmado == false` (cola offline)
+      final bool confirmado = _esEdicion
+          ? await crucesProv.actualizarCruce(cruceModelo)
+          : await crucesProv.agregarCruce(cruceModelo);
+
+      messenger.showSnackBar(SnackBar(
+        content: Text(confirmado
+            ? (_esEdicion ? 'Cruce actualizado' : 'Cruce registrado')
+            : 'Cruce guardado sin conexión: se sincronizará al volver el internet'),
+        backgroundColor: confirmado ? Colors.green : Colors.orange.shade800,
+      ));
+      if (mounted) navigator.pop();
     } catch (e) {
-      _mostrarError('Error: $e');
+      if (mounted) _mostrarError('Error: $e');
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
@@ -217,6 +231,17 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
     final padres = gallos.where((g) => g.sexo == 'Macho').toList();
     final madres = gallos.where((g) => g.sexo == 'Hembra').toList();
 
+    // Ítems de progenitores. Si en edición el ancestro ya no existe, se agrega
+    // un ítem con su nombre desnormalizado para no perder el vínculo (RN-03/04)
+    // y para que DropdownButtonFormField no falle por valor inexistente.
+    List<DropdownMenuItem<String>> itemsProgenitor(List<Gallo> lista, String? idActual, String? nombreGuardado) {
+      final items = lista.map((g) => DropdownMenuItem(value: g.id, child: Text(g.nombre))).toList();
+      if (idActual != null && !lista.any((g) => g.id == idActual)) {
+        items.add(DropdownMenuItem(value: idActual, child: Text('${nombreGuardado ?? 'Desconocido'} (eliminado)')));
+      }
+      return items;
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_esEdicion ? 'Editar Cruce' : 'Nuevo Cruce Genético'),
@@ -232,16 +257,18 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                 children: [
                   _buildCard('🧬 Los Padres', [
                     DropdownButtonFormField<String>(
+                      key: ValueKey('padre-$_padreId'),
                       decoration: _inputDeco('Padre (Macho)', FontAwesomeIcons.mars),
-                      value: _padreId,
-                      items: padres.map((g) => DropdownMenuItem(value: g.id, child: Text(g.nombre))).toList(),
+                      initialValue: _padreId,
+                      items: itemsProgenitor(padres, _padreId, widget.cruceEditar?.nombrePadre),
                       onChanged: (v) => setState(() => _padreId = v),
                     ),
                     const SizedBox(height: 15),
                     DropdownButtonFormField<String>(
+                      key: ValueKey('madre-$_madreId'),
                       decoration: _inputDeco('Madre (Hembra)', FontAwesomeIcons.venus),
-                      value: _madreId,
-                      items: madres.map((g) => DropdownMenuItem(value: g.id, child: Text(g.nombre))).toList(),
+                      initialValue: _madreId,
+                      items: itemsProgenitor(madres, _madreId, widget.cruceEditar?.nombreMadre),
                       onChanged: (v) => setState(() => _madreId = v),
                     ),
                   ]),
@@ -269,8 +296,9 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: _faseLunar,
-                          items: ['Creciente', 'Menguante', 'Llena', 'Nueva'].map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
+                          key: ValueKey('luna-$_faseLunar'),
+                          initialValue: _fasesLunares.contains(_faseLunar) ? _faseLunar : null,
+                          items: _fasesLunares.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
                           onChanged: (v) => setState(() => _faseLunar = v),
                           decoration: _inputDeco('Luna', FontAwesomeIcons.moon),
                         ),
@@ -336,7 +364,8 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
 
                   _buildCard('🏷️ Identificación Inclusiva', [
                       DropdownButtonFormField<String>(
-                        value: _pataMarca,
+                        key: ValueKey('marca-$_pataMarca'),
+                        initialValue: _pataMarca,
                         isExpanded: true, // Para que los textos largos no se corten
                         items: _opcionesIdentificacion.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
                         onChanged: (v) => setState(() => _pataMarca = v!),
@@ -372,7 +401,7 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                     height: 50,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(backgroundColor: _colorTema),
-                      onPressed: _guardar,
+                      onPressed: _guardando ? null : _guardar,
                       child: Text(_esEdicion ? 'ACTUALIZAR DATOS' : 'GUARDAR CRUCE', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   )
@@ -394,9 +423,11 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
           ? NetworkImage(_imagenNueva!.path) as ImageProvider 
           : FileImage(File(_imagenNueva!.path));
       hayFoto = true;
-    } else if (_fotoActualBase64 != null && _fotoActualBase64!.startsWith('base64')) {
-      imgProvider = MemoryImage(base64Decode(_fotoActualBase64!.split(',').last));
+    } else if (_fotoActualBytes != null) {
+      imgProvider = MemoryImage(_fotoActualBytes!);
       hayFoto = true;
+    } else if (_fotoActualBase64 != null) {
+      hayFoto = true; // Foto corrupta/ilegible: igual se permite borrarla
     }
 
     return Stack(
@@ -464,15 +495,7 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
       labelText: label,
       labelStyle: const TextStyle(fontSize: 13),
       prefixIcon: icon != null 
-          ? Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                icon is IconData 
-                    ? Icon(icon, size: 18, color: const Color(0xFF1E3A8A)) // Ajusta el color si usas otro
-                    : FaIcon(icon, size: 18, color: const Color(0xFF1E3A8A))
-              ],
-            )
+          ? IconoAdaptativo.prefijo(icon, size: 18, color: const Color(0xFF1E3A8A))
           : null,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),

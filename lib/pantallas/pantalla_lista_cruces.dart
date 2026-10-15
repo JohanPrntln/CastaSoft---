@@ -1,4 +1,4 @@
-import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -9,7 +9,7 @@ import 'package:castasoft/pantallas/pantalla_formulario_cruce.dart';
 import 'package:castasoft/pantallas/pantalla_detalle_cruce.dart';
 
 class PantallaListaCruces extends StatefulWidget {
-  const PantallaListaCruces({Key? key}) : super(key: key);
+  const PantallaListaCruces({super.key});
 
   @override
   State<PantallaListaCruces> createState() => _PantallaListaCrucesState();
@@ -31,10 +31,10 @@ class _PantallaListaCrucesState extends State<PantallaListaCruces> {
     });
   }
 
-  void _mostrarImagenGrande(BuildContext context, String base64String) {
+  void _mostrarImagenGrande(BuildContext context, Uint8List bytes) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.9),
+      barrierColor: Colors.black.withValues(alpha: 0.9),
       builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: EdgeInsets.zero,
@@ -44,7 +44,7 @@ class _PantallaListaCrucesState extends State<PantallaListaCruces> {
             Center(
               child: InteractiveViewer(
                 panEnabled: true, minScale: 0.5, maxScale: 4,
-                child: Image.memory(base64Decode(base64String), fit: BoxFit.contain),
+                child: Image.memory(bytes, fit: BoxFit.contain),
               ),
             ),
             SafeArea(
@@ -69,9 +69,18 @@ class _PantallaListaCrucesState extends State<PantallaListaCruces> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar', style: TextStyle(color: Colors.grey))),
           TextButton(
             onPressed: () async {
+              // Se capturan antes del await (contexto asíncrono seguro)
+              final crucesProv = context.read<CrucesProveedor>();
+              final messenger = ScaffoldMessenger.of(context);
               Navigator.pop(ctx);
-              await context.read<CrucesProveedor>().eliminarCruce(id);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cruce eliminado')));
+              try {
+                final confirmado = await crucesProv.eliminarCruce(id);
+                messenger.showSnackBar(SnackBar(content: Text(confirmado
+                    ? 'Cruce eliminado'
+                    : 'Cruce eliminado sin conexión: se sincronizará al volver el internet')));
+              } catch (e) {
+                messenger.showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+              }
             }, 
             child: const Text('ELIMINAR', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))
           ),
@@ -171,6 +180,7 @@ class _PantallaListaCrucesState extends State<PantallaListaCruces> {
                     itemCount: listaFinal.length,
                     itemBuilder: (ctx, i) {
                       final c = listaFinal[i];
+                      final fotoBytes = c.fotoBytes; // Memoizada en el modelo: O(1)
                       return Card(
                         elevation: 3,
                         margin: const EdgeInsets.only(bottom: 16),
@@ -187,15 +197,13 @@ class _PantallaListaCrucesState extends State<PantallaListaCruces> {
                                     // FOTO
                                     GestureDetector(
                                       onTap: () {
-                                        if (c.fotoPath != null && c.fotoPath!.startsWith('base64')) {
-                                          _mostrarImagenGrande(context, c.fotoPath!.split(',').last);
-                                        }
+                                        if (fotoBytes != null) _mostrarImagenGrande(context, fotoBytes);
                                       },
                                       child: Container(
                                         width: 70, height: 70,
                                         decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.grey.shade300)),
-                                        child: c.fotoPath != null && c.fotoPath!.startsWith('base64')
-                                          ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.memory(base64Decode(c.fotoPath!.split(',').last), fit: BoxFit.cover))
+                                        child: fotoBytes != null
+                                          ? ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.memory(fotoBytes, fit: BoxFit.cover, gaplessPlayback: true))
                                           : FaIcon(FontAwesomeIcons.egg, color: _colorTema, size: 30),
                                       ),
                                     ),
@@ -278,7 +286,7 @@ class _PantallaListaCrucesState extends State<PantallaListaCruces> {
     return ChoiceChip(
       label: Text(label),
       selected: estaSeleccionado,
-      selectedColor: _colorTema.withOpacity(0.2),
+      selectedColor: _colorTema.withValues(alpha: 0.2),
       backgroundColor: Colors.white,
       labelStyle: TextStyle(
         color: estaSeleccionado ? _colorTema : Colors.grey.shade700,

@@ -4,13 +4,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // 🔥 IMPORTANTE: Para verificar la sesión
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 
 // === TUS IMPORTACIONES ===
 import 'package:castasoft/pantallas/pantalla_inicio.dart';
 import 'package:castasoft/pantallas/pantalla_login.dart';
-import 'package:castasoft/datos/ayudante_db.dart';
 import 'package:castasoft/servicios/servicio_firestore.dart';
 
 // === PROVEEDORES ===
@@ -27,16 +27,34 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    _configurarPersistenciaOffline();
   } catch (e) {
-    // print('Error inicializando Firebase: $e');
+    debugPrint('Error inicializando Firebase: $e');
   }
 
-  // 3. Inicializar DB Local (Solo por seguridad/legado)
-  if(!kIsWeb){
-    await AyudanteDB.instancia.inicializarDB();
-  }
+  // 3. (Retirado) Antes se abría aquí la base SQLite legada de `ayudante_db.dart`.
+  //    La persistencia recae 100% en Cloud Firestore + su caché offline, así que
+  //    abrir SQLite solo consumía E/S en el arranque sin que nadie la leyera.
+
   // 4. Ejecutar la aplicación
   runApp(const AplicacionCastaSoft());
+}
+
+/// Habilita la caché local persistente de Firestore (debe ejecutarse antes de
+/// cualquier lectura/escritura). En Android/Windows viene activa por defecto,
+/// pero en Web NO: sin esto, la app web pierde los datos al recargar sin red.
+void _configurarPersistenciaOffline() {
+  try {
+    FirebaseFirestore.instance.settings = Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+      // Web: permite varias pestañas abiertas compartiendo la misma caché IndexedDB
+      webPersistentTabManager: kIsWeb ? WebPersistentMultipleTabManager() : null,
+    );
+  } catch (e) {
+    // P. ej. navegador en modo incógnito sin IndexedDB: se sigue con caché en memoria
+    debugPrint('⚠️ Persistencia offline de Firestore no disponible: $e');
+  }
 }
 
 class AplicacionCastaSoft extends StatelessWidget {
@@ -80,8 +98,7 @@ class AplicacionCastaSoft extends StatelessWidget {
           colorScheme: const ColorScheme.light(
             primary: Color(0xFF1E3A8A),
             secondary: Color(0xFFD4AF37), // Dorado Premium
-            surface: Color(0xFFF8FAFC),
-            background: Color(0xFFF8FAFC),
+            surface: Color(0xFFF8FAFC), // ('background' está deprecado: usa surface)
           ),
           
           textTheme: GoogleFonts.poppinsTextTheme(),

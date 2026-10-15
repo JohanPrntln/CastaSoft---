@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:castasoft/modelos/usuario_modelo.dart';
+import 'package:castasoft/servicios/servicio_firestore.dart';
 
 class UsuarioProveedor with ChangeNotifier {
   UsuarioPerfil? _perfilActual;
@@ -33,7 +34,7 @@ class UsuarioProveedor with ChangeNotifier {
         notifyListeners(); // ¡Avisamos a la pantalla de inicio!
       }
     } catch (e) {
-      print('Error cargando perfil: $e');
+      debugPrint('Error cargando perfil: $e');
     } finally {
       _cargando = false;
       notifyListeners();
@@ -57,7 +58,7 @@ class UsuarioProveedor with ChangeNotifier {
         return false;
       }
     } catch (e) {
-      print('Error verificando: $e');
+      debugPrint('Error verificando: $e');
       return false;
     } finally {
       _cargando = false;
@@ -68,7 +69,8 @@ class UsuarioProveedor with ChangeNotifier {
   // ==========================================================
   // 3. GUARDAR PERFIL
   // ==========================================================
-  Future<void> guardarPerfil(UsuarioPerfil perfil) async {
+  /// Retorna `true` si el servidor confirmó, `false` si quedó en cola offline.
+  Future<bool> guardarPerfil(UsuarioPerfil perfil) async {
     final user = FirebaseAuth.instance.currentUser;
     
     if (user == null || user.uid.isEmpty) {
@@ -79,15 +81,18 @@ class UsuarioProveedor with ChangeNotifier {
     perfil.uid = user.uid;
 
     try {
-      await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(user.uid)
-          .set(perfil.toMap(), SetOptions(merge: true));
-          
+      final confirmado = await ServicioFirestore.confirmarEscritura(
+        FirebaseFirestore.instance
+            .collection('usuarios')
+            .doc(user.uid)
+            .set(perfil.toMap(), SetOptions(merge: true)),
+      );
+
       _perfilActual = perfil;
       notifyListeners(); // Actualiza la UI instantáneamente
+      return confirmado;
     } catch (e) {
-      print("Error guardando perfil: $e");
+      debugPrint("Error guardando perfil: $e");
       rethrow; 
     }
   }

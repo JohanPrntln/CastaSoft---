@@ -1,4 +1,13 @@
-import 'package:sqflite/sqflite.dart';
+// ============================================================================
+// ⚠️ CÓDIGO LEGADO AISLADO (Auditoría técnica, oct-2026)
+// ----------------------------------------------------------------------------
+// La arquitectura vigente (tesis) persiste el 100% de los datos en Cloud
+// Firestore + su caché offline. Esta clase ya NO se importa ni se inicializa
+// desde `main.dart` (antes abría un archivo SQLite en cada arranque nativo sin
+// que ningún proveedor lo leyera). Se conserva únicamente como referencia
+// histórica / posible migración de datos locales antiguos; al no estar
+// importada, el compilador la excluye del binario y del bundle Web.
+// ============================================================================
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io' show Platform, Directory;

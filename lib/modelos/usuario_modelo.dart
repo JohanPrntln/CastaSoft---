@@ -1,3 +1,7 @@
+import 'dart:typed_data';
+
+import 'package:castasoft/modelos/foto_base64.dart';
+
 class UsuarioPerfil {
   String uid;
   String nombrePropietario;
@@ -6,6 +10,20 @@ class UsuarioPerfil {
   String? telefono;
   String? direccion;
   String email;
+
+  // Caché del logo decodificado. Se invalida sola si `logoPath` cambia
+  // (este modelo es mutable), comparando por identidad la cadena fuente.
+  String? _logoFuenteCache;
+  Uint8List? _logoBytesCache;
+
+  /// Bytes del logo en Base64, decodificados una sola vez por valor de [logoPath].
+  Uint8List? get logoBytes {
+    if (!identical(_logoFuenteCache, logoPath)) {
+      _logoFuenteCache = logoPath;
+      _logoBytesCache = decodificarFotoBase64(logoPath);
+    }
+    return _logoBytesCache;
+  }
 
   UsuarioPerfil({
     required this.uid,

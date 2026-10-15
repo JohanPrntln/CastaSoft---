@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:castasoft/modelos/cruce_modelo.dart';
+import 'package:castasoft/servicios/servicio_firestore.dart';
 
 class CrucesProveedor with ChangeNotifier {
   List<CruceModelo> _cruces = [];
@@ -35,57 +36,57 @@ class CrucesProveedor with ChangeNotifier {
       }).toList();
       
     } catch (e) {
-      print("Error cargando cruces: $e");
+      debugPrint("Error cargando cruces: $e");
     } finally {
       _cargando = false;
       notifyListeners();
     }
   }
 
+  // Retornan `true` si el servidor confirmó, `false` si la escritura quedó en
+  // la caché local de Firestore (offline) pendiente de sincronizar.
+
+  /// RN-02 / RN-04 / RN-05: valida el cruce y fuerza el `userId` autenticado.
+  Map<String, dynamic> _prepararParaEscritura(CruceModelo cruce) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) throw Exception('Debes iniciar sesión');
+    final error = cruce.validar();
+    if (error != null) throw Exception(error);
+    return cruce.toMap()..['userId'] = uid;
+  }
+
   // 2. CREAR CRUCE
-  Future<void> agregarCruce(CruceModelo cruce) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('cruces')
-          .doc(cruce.id)
-          .set(cruce.toMap());
-      
-      _cruces.insert(0, cruce); 
-      notifyListeners();
-    } catch (e) {
-      print("Error creando cruce: $e");
-      rethrow;
-    }
+  Future<bool> agregarCruce(CruceModelo cruce) async {
+    final datos = _prepararParaEscritura(cruce);
+    final confirmado = await ServicioFirestore.confirmarEscritura(
+      FirebaseFirestore.instance.collection('cruces').doc(cruce.id).set(datos),
+    );
+    _cruces.insert(0, CruceModelo.fromMap(datos));
+    notifyListeners();
+    return confirmado;
   }
 
   // 3. ELIMINAR CRUCE
-  Future<void> eliminarCruce(String id) async {
-    try {
-      await FirebaseFirestore.instance.collection('cruces').doc(id).delete();
-      _cruces.removeWhere((c) => c.id == id);
-      notifyListeners();
-    } catch (e) {
-      print("Error eliminando: $e");
-      rethrow;
-    }
+  Future<bool> eliminarCruce(String id) async {
+    final confirmado = await ServicioFirestore.confirmarEscritura(
+      FirebaseFirestore.instance.collection('cruces').doc(id).delete(),
+    );
+    _cruces.removeWhere((c) => c.id == id);
+    notifyListeners();
+    return confirmado;
   }
 
   // 4. ACTUALIZAR CRUCE
-  Future<void> actualizarCruce(CruceModelo cruce) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('cruces')
-          .doc(cruce.id)
-          .update(cruce.toMap());
-
-      final index = _cruces.indexWhere((c) => c.id == cruce.id);
-      if (index != -1) {
-        _cruces[index] = cruce;
-        notifyListeners();
-      }
-    } catch (e) {
-      print("Error actualizando cruce: $e");
-      rethrow;
+  Future<bool> actualizarCruce(CruceModelo cruce) async {
+    final datos = _prepararParaEscritura(cruce);
+    final confirmado = await ServicioFirestore.confirmarEscritura(
+      FirebaseFirestore.instance.collection('cruces').doc(cruce.id).update(datos),
+    );
+    final index = _cruces.indexWhere((c) => c.id == cruce.id);
+    if (index != -1) {
+      _cruces[index] = CruceModelo.fromMap(datos);
+      notifyListeners();
     }
+    return confirmado;
   }
 }
