@@ -10,7 +10,8 @@ class GallosProveedor extends ChangeNotifier {
   Map<String, Gallo> _indicePorId = {};
   // true cuando ya llegó al menos un snapshot (de servidor o de caché local)
   bool _datosCargados = false;
-  final ServicioFirestore _servicioFirestore = ServicioFirestore();
+  // `late`: no toca Firebase hasta usarse (permite el constructor en memoria).
+  late final ServicioFirestore _servicioFirestore = ServicioFirestore();
   StreamSubscription? _gallosSubscription;
   StreamSubscription? _authSubscription; 
 
@@ -31,6 +32,14 @@ class GallosProveedor extends ChangeNotifier {
         notifyListeners();
       }
     });
+  }
+
+  /// Proveedor sin Firebase con una lista fija, para pruebas automatizadas.
+  @visibleForTesting
+  GallosProveedor.enMemoria(List<Gallo> gallos) {
+    _gallos = List.of(gallos);
+    _indicePorId = {for (final g in gallos) g.id: g};
+    _datosCargados = true;
   }
 
   void _iniciarEscuchaEnTiempoReal() {

@@ -1,6 +1,6 @@
 import 'dart:io' show Directory, File, Platform;
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -127,6 +127,14 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
   }
 
   Future<void> _guardarImagen({bool soloCompartir = false}) async {
+    // Campos requeridos del certificado: no se aceptan solo espacios
+    if (_nombreCtrl.text.trim().isEmpty || _placaCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('El nombre y la placa del ejemplar son obligatorios'),
+        backgroundColor: Colors.red,
+      ));
+      return;
+    }
     setState(() => _cargando = true);
     await Future.delayed(const Duration(milliseconds: 500)); 
 
@@ -183,7 +191,8 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
   }
 
   String _generarLinkWhatsApp() {
-    String numero = _whatsappCtrl.text.trim();
+    // wa.me solo acepta dígitos: se quitan espacios, guiones y '+'
+    String numero = _whatsappCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
     if (numero.isEmpty) return 'https://wa.me'; 
     return 'https://wa.me/$_prefijoPais$numero?text=Hola, me interesa ver el pedigrí del gallo ${_nombreCtrl.text} (Placa: ${_placaCtrl.text})';
   }
@@ -452,7 +461,9 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
       child: TextField(
-        controller: ctrl, keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+        controller: ctrl, keyboardType: isNumber ? TextInputType.phone : TextInputType.text,
+        inputFormatters: isNumber ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9+\s\-]'))] : null,
+        maxLength: isNumber ? 20 : null,
         decoration: InputDecoration(
           labelText: label, 
           prefixIcon: icon != null 
@@ -568,4 +579,4 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
       ),
     );
   }
-}
+}

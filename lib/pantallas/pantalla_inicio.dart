@@ -116,7 +116,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
         },
         backgroundColor: const Color(0xFFD4AF37),
         elevation: 4,
-        tooltip: 'Registrar Nuevo Gallo',
+        tooltip: 'Registrar Ejemplar',
         child: const FaIcon(FontAwesomeIcons.plus, color: Color(0xFF1E3A8A)),
       ),
     );
@@ -483,6 +483,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
                     onTap: () => _navegarADetalleGallo(context, gallo),
                     child: TarjetaGallo(
                       gallo: gallo,
+                      onTap: () => _navegarADetalleGallo(context, gallo),
                       // La lista se actualiza sola por el stream en tiempo real
                       onEdit: () => Navigator.push(
                         context,
@@ -688,4 +689,4 @@ class _PantallaInicioState extends State<PantallaInicio> {
       child: const FaIcon(FontAwesomeIcons.houseUser, color: Color(0xFF1E3A8A), size: 20),
     );
   }
-}
+}

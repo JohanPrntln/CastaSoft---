@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io' show File;
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -58,8 +58,6 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
     'Sin Marca / Otro'
   ];
 
-  static const List<String> _fasesLunares = ['Creciente', 'Menguante', 'Llena', 'Nueva'];
-
   DateTime _fechaSeleccionada = DateTime.now();
   XFile? _imagenNueva;
   String? _fotoActualBase64; 
@@ -84,7 +82,8 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
     _madreId = c.madreId;
     _fechaSeleccionada = c.fechaCruce;
     _ctrlFecha.text = DateFormat('dd/MM/yyyy').format(c.fechaCruce);
-    _faseLunar = c.faseLunar;
+    // Valores antiguos ('Llena', 'Nueva'...) se mapean a las 8 fases oficiales
+    _faseLunar = Gallo.normalizarFaseLunar(c.faseLunar);
     _ctrlCantidad.text = c.cantidadPollitos.toString();
     _ctrlMuertos.text = c.pollitosMuertos.toString();
     _ctrlMachos.text = c.pollitosMachos.toString();
@@ -186,7 +185,7 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
         madreId: _madreId!,
         nombreMadre: nombreM,
         fechaCruce: _fechaSeleccionada,
-        faseLunar: _faseLunar ?? 'Creciente',
+        faseLunar: _faseLunar ?? 'Luna creciente',
         cantidadPollitos: total,
         pollitosMuertos: muertos,
         pollitosVivos: vivos, 
@@ -262,6 +261,7 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                       initialValue: _padreId,
                       items: itemsProgenitor(padres, _padreId, widget.cruceEditar?.nombrePadre),
                       onChanged: (v) => setState(() => _padreId = v),
+                      validator: (v) => (v == null || v.isEmpty) ? 'Selecciona el padre' : null,
                     ),
                     const SizedBox(height: 15),
                     DropdownButtonFormField<String>(
@@ -270,6 +270,7 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                       initialValue: _madreId,
                       items: itemsProgenitor(madres, _madreId, widget.cruceEditar?.nombreMadre),
                       onChanged: (v) => setState(() => _madreId = v),
+                      validator: (v) => (v == null || v.isEmpty) ? 'Selecciona la madre' : null,
                     ),
                   ]),
 
@@ -297,8 +298,11 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           key: ValueKey('luna-$_faseLunar'),
-                          initialValue: _fasesLunares.contains(_faseLunar) ? _faseLunar : null,
-                          items: _fasesLunares.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
+                          isExpanded: true,
+                          initialValue: _faseLunar,
+                          items: Gallo.opcionesFaseLunar(_faseLunar)
+                              .map((l) => DropdownMenuItem(value: l, child: Text(l, overflow: TextOverflow.ellipsis)))
+                              .toList(),
                           onChanged: (v) => setState(() => _faseLunar = v),
                           decoration: _inputDeco('Luna', FontAwesomeIcons.moon),
                         ),
@@ -312,8 +316,10 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                           child: TextFormField(
                             controller: _ctrlCantidad,
                             keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            maxLength: 3,
                             decoration: _inputDeco('Total Huevos', FontAwesomeIcons.egg),
-                            validator: (v) => v!.isEmpty ? 'Requerido' : null,
+                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                             onChanged: (v) => setState((){}),
                           ),
                         ),
@@ -322,9 +328,11 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                           child: TextFormField(
                             controller: _ctrlMuertos,
                             keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            maxLength: 3,
                             style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
                             decoration: _inputDeco('Bajas/Muertos', FontAwesomeIcons.skull),
-                            validator: (v) => v!.isEmpty ? 'Requerido' : null,
+                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                             onChanged: (v) => setState((){}),
                           ),
                         ),
@@ -343,6 +351,8 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                           child: TextFormField(
                             controller: _ctrlMachos,
                             keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            maxLength: 3,
                             style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold),
                             decoration: _inputDeco('Machos', FontAwesomeIcons.mars),
                           ),
@@ -352,6 +362,8 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                           child: TextFormField(
                             controller: _ctrlHembras,
                             keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            maxLength: 3,
                             style: TextStyle(color: Colors.pink.shade700, fontWeight: FontWeight.bold),
                             decoration: _inputDeco('Hembras', FontAwesomeIcons.venus),
                           ),
@@ -375,6 +387,7 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                       TextFormField(
                         controller: _ctrlMarca,
                         maxLines: 2,
+                        maxLength: 60,
                         decoration: _inputDeco('Detalle (Ej: Argolla roja #2, Placa 55)', FontAwesomeIcons.tag),
                       ),
                   ]),
@@ -385,6 +398,7 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                       TextFormField(
                         controller: _ctrlNotas,
                         maxLines: 3,
+                        maxLength: 300,
                         decoration: _inputDeco('Observaciones adicionales', Icons.note),
                       ),
                   ]),
@@ -501,4 +515,4 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
     );
   }
-}
+}

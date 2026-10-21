@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'package:intl/intl.dart';
+
 import 'package:castasoft/modelos/foto_base64.dart';
 
 /// MODELO MAESTRO - CASTASOFT
@@ -17,6 +19,127 @@ class Gallo {
   /// Etapas eliminadas en el Sprint 1. Los registros que aún las tengan se
   /// marcan con el filtro '⚠️ Actualizar' para que el usuario las reasigne.
   static const List<String> etapasLegadas = ['Levante', 'Descanso'];
+
+  /// Etapas biológicamente válidas para un macho.
+  static const List<String> etapasMacho = ['Cría', 'Pollos crestones', 'Muda', 'Padrote', 'Combate'];
+
+  /// Etapas biológicamente válidas para una hembra.
+  static const List<String> etapasHembra = ['Cría', 'Pollonas', 'Muda', 'Postura', 'Madrilla'];
+
+  /// Etapas permitidas según el sexo (sexo desconocido: catálogo completo).
+  static List<String> etapasParaSexo(String? sexo) {
+    switch (sexo) {
+      case 'Macho':
+        return etapasMacho;
+      case 'Hembra':
+        return etapasHembra;
+      default:
+        return etapasVida;
+    }
+  }
+
+  /// Las 8 fases lunares oficiales.
+  static const List<String> fasesLunares = [
+    'Luna nueva',
+    'Luna creciente',
+    'Cuarto creciente',
+    'Gibosa creciente',
+    'Luna llena',
+    'Gibosa menguante',
+    'Cuarto menguante',
+    'Luna menguante',
+  ];
+
+  static const Map<String, String> _fasesLunaresLegadas = {
+    'nueva': 'Luna nueva',
+    'creciente': 'Luna creciente',
+    'llena': 'Luna llena',
+    'menguante': 'Luna menguante',
+  };
+
+  /// Convierte valores antiguos de Firestore ('Llena', 'luna llena'...) a una
+  /// de las [fasesLunares]. Si no se reconoce, devuelve el texto original
+  /// (recortado) para que el formulario lo conserve; `null` si está vacío.
+  static String? normalizarFaseLunar(String? valor) {
+    final limpio = valor?.trim() ?? '';
+    if (limpio.isEmpty) return null;
+    final clave = limpio.toLowerCase();
+    for (final fase in fasesLunares) {
+      if (fase.toLowerCase() == clave) return fase;
+    }
+    return _fasesLunaresLegadas[clave] ?? limpio;
+  }
+
+  /// Opciones del desplegable de fase lunar; agrega el valor guardado si no es
+  /// oficial para que el `DropdownButtonFormField` no falle al editar.
+  static List<String> opcionesFaseLunar(String? actual) {
+    final opciones = List<String>.of(fasesLunares);
+    final normalizada = normalizarFaseLunar(actual);
+    if (normalizada != null && !opciones.contains(normalizada)) opciones.add(normalizada);
+    return opciones;
+  }
+
+  /// Líneas genéticas sugeridas en el selector del formulario.
+  static const List<String> lineasGeneticasBase = [
+    'Kelso', 'Hatch', 'Sweater', 'Albany', 'Giro', 'Claret', 'Asil', 'Radio', 'Roundhead', 'Regular / Propia',
+  ];
+
+  /// Colores de pluma sugeridos en el selector del formulario.
+  static const List<String> coloresPlumaBase = [
+    'Giro', 'Cenizo', 'Colorado', 'Grillo', 'Pinto', 'Negro', 'Blanco', 'Jabao', 'Canelo', 'Gallino', 'Mixto',
+  ];
+
+  /// Vacunas / tratamientos avícolas sugeridos (HU-04).
+  static const List<String> vacunasComunes = [
+    'Newcastle', 'Viruela Aviar', 'Bronquitis Infecciosa', 'Gumboro', 'Marek', 'Coriza Infecciosa',
+    'Cólera Aviar', 'Desparasitación Interna', 'Desparasitación Externa', 'Complejo Vitamínico',
+  ];
+
+  // ==================== VALIDACIONES DE FORMULARIO ====================
+  static const double pesoMinimoLbs = 0.1;
+  static const double pesoMaximoLbs = 25.0;
+
+  static final RegExp _letra = RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ]');
+  static final RegExp _dosLetras = RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ]{2,}');
+
+  /// Caracteres permitidos al escribir un color de pluma (sin números).
+  static final RegExp caracteresColorPluma = RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s\/\-]');
+
+  /// Formato de peso: hasta 2 enteros y 2 decimales.
+  static final RegExp formatoPeso = RegExp(r'^\d{0,2}(\.\d{0,2})?$');
+
+  /// Peso en Lbs dentro del rango biológico (> 0.1 y <= 25.0).
+  static String? validarPeso(String? valor, {bool obligatorio = false}) {
+    final texto = valor?.trim().replaceAll(',', '.') ?? '';
+    if (texto.isEmpty) return obligatorio ? 'Requerido' : null;
+    final peso = double.tryParse(texto);
+    if (peso == null) return 'Número inválido';
+    if (peso <= pesoMinimoLbs || peso > pesoMaximoLbs) {
+      return 'Debe ser > $pesoMinimoLbs y <= $pesoMaximoLbs Lbs';
+    }
+    return null;
+  }
+
+  /// Color de pluma escrito a mano: solo letras y mínimo 3 de ellas.
+  static String? validarColorPluma(String? valor) {
+    final texto = valor?.trim() ?? '';
+    if (texto.isEmpty) return 'Requerido';
+    if (texto.split('').any((c) => !caracteresColorPluma.hasMatch(c))) return 'Solo letras';
+    if (_letra.allMatches(texto).length < 3) return 'Mínimo 3 letras';
+    return null;
+  }
+
+  /// Línea genética escrita a mano: admite "F1 Kelso 50%", pero exige 2 letras seguidas.
+  static String? validarLineaGenetica(String? valor) {
+    final texto = valor?.trim() ?? '';
+    if (texto.isEmpty) return 'Requerido';
+    if (!_dosLetras.hasMatch(texto)) return 'Debe contener al menos 2 letras';
+    return null;
+  }
+
+  /// Texto de un evento del historial con su fecha (HU-04).
+  static String eventoConFecha(String evento, DateTime fecha) =>
+      '${evento.trim()} (${DateFormat('dd/MM/yyyy').format(fecha)})';
 
   // ==================== 1. IDENTIFICACIÓN ====================
   final String id;

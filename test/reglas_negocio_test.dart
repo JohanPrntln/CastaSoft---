@@ -3,13 +3,21 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import 'package:castasoft/componentes/icono_adaptativo.dart';
+import 'package:castasoft/componentes/tarjeta_gallo.dart';
 import 'package:castasoft/modelos/cruce_modelo.dart';
 import 'package:castasoft/modelos/foto_base64.dart';
 import 'package:castasoft/modelos/gallo_modelo.dart';
+import 'package:castasoft/pantallas/pantalla_formulario_gallo.dart';
+import 'package:castasoft/proveedores/gallos_proveedor.dart';
 
 void main() {
+  GoogleFonts.config.allowRuntimeFetching = false;
+
   group('RN-02 / RN-04: CruceModelo.validarReglasNegocio', () {
     String? validar({String? padre = 'p', String? madre = 'm', int total = 10, int muertos = 0, int machos = 0, int hembras = 0}) =>
         CruceModelo.validarReglasNegocio(
@@ -88,5 +96,216 @@ void main() {
     ));
     expect(tester.getSize(find.byKey(const Key('material'))), tester.getSize(find.byKey(const Key('fa'))));
     expect(tester.getSize(find.byKey(const Key('fa'))).width, 48);
+  });
+
+  group('Coherencia biológica: Gallo.etapasParaSexo', () {
+    test('macho y hembra tienen etapas propias', () {
+      expect(Gallo.etapasParaSexo('Macho'), ['Cría', 'Pollos crestones', 'Muda', 'Padrote', 'Combate']);
+      expect(Gallo.etapasParaSexo('Hembra'), ['Cría', 'Pollonas', 'Muda', 'Postura', 'Madrilla']);
+    });
+    test('un macho no puede ser Madrilla/Pollonas/Postura ni una hembra Padrote/Pollos crestones/Combate', () {
+      for (final e in ['Madrilla', 'Pollonas', 'Postura']) {
+        expect(Gallo.etapasParaSexo('Macho'), isNot(contains(e)));
+      }
+      for (final e in ['Padrote', 'Pollos crestones', 'Combate']) {
+        expect(Gallo.etapasParaSexo('Hembra'), isNot(contains(e)));
+      }
+    });
+    test('sexo desconocido devuelve el catálogo completo', () {
+      expect(Gallo.etapasParaSexo(null), Gallo.etapasVida);
+    });
+  });
+
+  group('Fases lunares: Gallo.normalizarFaseLunar', () {
+    test('las 8 fases oficiales se conservan', () {
+      expect(Gallo.fasesLunares, hasLength(8));
+      for (final fase in Gallo.fasesLunares) {
+        expect(Gallo.normalizarFaseLunar(fase), fase);
+        expect(Gallo.normalizarFaseLunar('  ${fase.toUpperCase()} '), fase);
+      }
+    });
+    test('mapea valores antiguos de Firestore', () {
+      expect(Gallo.normalizarFaseLunar('Nueva'), 'Luna nueva');
+      expect(Gallo.normalizarFaseLunar('luna nueva'), 'Luna nueva');
+      expect(Gallo.normalizarFaseLunar('Creciente'), 'Luna creciente');
+      expect(Gallo.normalizarFaseLunar('luna creciente'), 'Luna creciente');
+      expect(Gallo.normalizarFaseLunar('Llena'), 'Luna llena');
+      expect(Gallo.normalizarFaseLunar(' luna llena '), 'Luna llena');
+      expect(Gallo.normalizarFaseLunar('Menguante'), 'Luna menguante');
+      expect(Gallo.normalizarFaseLunar('LUNA MENGUANTE'), 'Luna menguante');
+    });
+    test('vacíos son null y desconocidos se conservan en las opciones del desplegable', () {
+      expect(Gallo.normalizarFaseLunar(null), isNull);
+      expect(Gallo.normalizarFaseLunar('   '), isNull);
+      expect(Gallo.normalizarFaseLunar('Eclipse'), 'Eclipse');
+      expect(Gallo.opcionesFaseLunar('Eclipse'), [...Gallo.fasesLunares, 'Eclipse']);
+      expect(Gallo.opcionesFaseLunar('Llena'), Gallo.fasesLunares);
+    });
+  });
+
+  group('Validaciones de formulario', () {
+    test('peso: rango biológico > 0.1 y <= 25.0 Lbs', () {
+      expect(Gallo.validarPeso('5.5', obligatorio: true), isNull);
+      expect(Gallo.validarPeso('25', obligatorio: true), isNull);
+      expect(Gallo.validarPeso('0.11'), isNull);
+      expect(Gallo.validarPeso('4,5'), isNull);
+      expect(Gallo.validarPeso('25.01'), isNotNull);
+      expect(Gallo.validarPeso('0.1'), isNotNull);
+      expect(Gallo.validarPeso('0'), isNotNull);
+      expect(Gallo.validarPeso('abc'), isNotNull);
+      expect(Gallo.validarPeso('', obligatorio: true), 'Requerido');
+      expect(Gallo.validarPeso(''), isNull);
+    });
+    test('formato de peso: hasta 2 enteros y 2 decimales, sin signos', () {
+      expect(Gallo.formatoPeso.hasMatch('12.34'), isTrue);
+      expect(Gallo.formatoPeso.hasMatch('123'), isFalse);
+      expect(Gallo.formatoPeso.hasMatch('1.234'), isFalse);
+      expect(Gallo.formatoPeso.hasMatch('-5'), isFalse);
+      expect(Gallo.formatoPeso.hasMatch('+5'), isFalse);
+    });
+    test('color pluma: rechaza números y exige 3 letras', () {
+      expect(Gallo.validarColorPluma('Giro'), isNull);
+      expect(Gallo.validarColorPluma('Negro / Blanco'), isNull);
+      expect(Gallo.validarColorPluma('Giro2'), isNotNull);
+      expect(Gallo.validarColorPluma('123'), isNotNull);
+      expect(Gallo.validarColorPluma('ab'), isNotNull);
+      expect(Gallo.validarColorPluma('   '), isNotNull);
+    });
+    test('línea genética: admite cruces filiales y rechaza solo números/símbolos', () {
+      expect(Gallo.validarLineaGenetica('F1 Kelso 50%'), isNull);
+      expect(Gallo.validarLineaGenetica('Hatch'), isNull);
+      expect(Gallo.validarLineaGenetica('12345'), isNotNull);
+      expect(Gallo.validarLineaGenetica('50% - 25%'), isNotNull);
+      expect(Gallo.validarLineaGenetica('F1'), isNotNull);
+      expect(Gallo.validarLineaGenetica(''), isNotNull);
+    });
+    test('HU-04: evento + fecha', () {
+      expect(Gallo.eventoConFecha('  Newcastle ', DateTime(2026, 3, 7)), 'Newcastle (07/03/2026)');
+    });
+  });
+
+  group('PantallaFormularioGallo', () {
+    Future<void> abrirFormulario(WidgetTester tester, {Gallo? galloEditar}) async {
+      tester.view.physicalSize = const Size(1200, 3200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(ChangeNotifierProvider<GallosProveedor>(
+        create: (_) => GallosProveedor.enMemoria([if (galloEditar != null) galloEditar]),
+        child: MaterialApp(home: PantallaFormularioGallo(galloEditar: galloEditar)),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> elegir(WidgetTester tester, String actual, String nuevo) async {
+      await tester.tap(find.text(actual).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(nuevo).last);
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> irAGestion(WidgetTester tester) async {
+      await tester.tap(find.text('Gestión'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('título dinámico y ocultamiento de combate al elegir Hembra', (tester) async {
+      await abrirFormulario(tester);
+      expect(find.text('Registrar Gallo / Macho'), findsOneWidget);
+
+      await irAGestion(tester);
+      expect(find.text('Peso Pactado (Lbs)'), findsOneWidget);
+      expect(find.text('Historial de Peleas'), findsOneWidget);
+
+      await tester.tap(find.text('Datos'));
+      await tester.pumpAndSettle();
+      await elegir(tester, 'Macho', 'Hembra');
+      expect(find.text('Registrar Gallina / Hembra'), findsOneWidget);
+
+      await irAGestion(tester);
+      expect(find.text('Peso Pactado (Lbs)'), findsNothing);
+      expect(find.text('Historial de Peleas'), findsNothing);
+    });
+
+    testWidgets('al cambiar de sexo, una etapa incompatible vuelve a Cría', (tester) async {
+      final macho = Gallo(
+        id: 'g1', placa: 'A1', nombre: 'Rayo', sexo: 'Macho', fechaNacimiento: DateTime(2024),
+        lineaGenetica: 'Kelso', colorPluma: 'Giro', faseLunar: 'Llena', estado: 'Activo', etapaVida: 'Combate',
+      );
+      await abrirFormulario(tester, galloEditar: macho);
+      expect(find.text('Editar Gallo / Macho'), findsOneWidget);
+      // Fase lunar antigua normalizada
+      expect(find.text('Luna llena'), findsOneWidget);
+
+      await elegir(tester, 'Macho', 'Hembra');
+      expect(find.text('Editar Gallina / Hembra'), findsOneWidget);
+      await irAGestion(tester);
+      expect(find.text('Combate'), findsNothing);
+      expect(find.text('Cría'), findsOneWidget);
+    });
+
+    testWidgets('registro antiguo con etapa legada abre sin errores', (tester) async {
+      final hembra = Gallo(
+        id: 'g2', placa: 'ARGOLLA AZUL PATA DERECHA', nombre: 'Perla', sexo: 'Hembra', fechaNacimiento: DateTime(2023),
+        lineaGenetica: 'Hatch', colorPluma: 'Cenizo', faseLunar: 'Eclipse', estado: 'Activo', etapaVida: 'Levante',
+      );
+      await abrirFormulario(tester, galloEditar: hembra);
+      expect(tester.takeException(), isNull);
+      expect(find.text('Eclipse'), findsOneWidget);
+      await irAGestion(tester);
+      expect(find.text('Levante'), findsOneWidget);
+    });
+
+    testWidgets('peso bloquea letras/signos y Color Pluma manual bloquea números', (tester) async {
+      await abrirFormulario(tester);
+      final peso = find.byKey(const Key('campo-peso-actual'));
+      await tester.enterText(peso, '-abc');
+      expect(tester.widget<TextFormField>(peso).controller!.text, '');
+      await tester.enterText(peso, '12.5');
+      expect(tester.widget<TextFormField>(peso).controller!.text, '12.5');
+
+      await elegir(tester, 'Color Pluma', '➕ Otro (Escribir manualmente...)');
+      final color = find.byKey(const Key('color-manual'));
+      expect(color, findsOneWidget);
+      await tester.enterText(color, 'Giro123');
+      expect(tester.widget<TextFormField>(color).controller!.text, 'Giro');
+
+      await tester.tap(find.byKey(const Key('color-volver-lista')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('color-manual')), findsNothing);
+    });
+
+    testWidgets('HU-04: agregar vacuna concatena la fecha seleccionada', (tester) async {
+      await abrirFormulario(tester);
+      await irAGestion(tester);
+      await elegir(tester, 'Agregar Vacuna', 'Newcastle');
+      await tester.tap(find.byKey(const Key('agregar-vacuna')));
+      await tester.pumpAndSettle();
+      final hoy = DateFormat('dd/MM/yyyy').format(DateTime.now());
+      expect(find.text('Newcastle ($hoy)'), findsOneWidget);
+
+      // Vacío: no se agrega nada (RN-07)
+      await tester.tap(find.byKey(const Key('agregar-vacuna')));
+      await tester.pumpAndSettle();
+      expect(find.byType(Chip), findsOneWidget);
+    });
+  });
+
+  testWidgets('TarjetaGallo muestra el botón "Ver ficha"', (tester) async {
+    var abierto = false;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: TarjetaGallo(
+          gallo: Gallo(
+            id: 'g3', placa: 'B2', nombre: 'Trueno', sexo: 'Macho', fechaNacimiento: DateTime(2024),
+            lineaGenetica: 'Kelso', colorPluma: 'Giro', faseLunar: 'Luna llena', estado: 'Activo',
+          ),
+          onTap: () => abierto = true,
+        ),
+      ),
+    ));
+    expect(find.text('Ver ficha'), findsOneWidget);
+    expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
+    await tester.tap(find.byKey(const Key('boton-ver-ficha')));
+    expect(abierto, isTrue);
   });
 }

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io' show File;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
@@ -210,6 +211,8 @@ class _PantallaConfiguracionPerfilState extends State<PantallaConfiguracionPerfi
     return TextFormField(
       controller: ctrl,
       keyboardType: isNumber ? TextInputType.phone : TextInputType.text,
+      inputFormatters: isNumber ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9+\s\-]'))] : null,
+      maxLength: isNumber ? 20 : null,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: IconoAdaptativo.prefijo(icon, color: const Color(0xFF1E3A8A), size: 18),
@@ -220,4 +223,4 @@ class _PantallaConfiguracionPerfilState extends State<PantallaConfiguracionPerfi
       validator: requerido ? (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null : null,
     );
   }
-}
+}

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:castasoft/modelos/gallo_modelo.dart';
+import 'package:castasoft/pantallas/pantalla_detalle_gallo.dart';
 
 class TarjetaGallo extends StatelessWidget {
   final Gallo gallo;
@@ -229,10 +230,38 @@ class TarjetaGallo extends StatelessWidget {
                       
                       const SizedBox(height: 8),
 
-                      // Botones de acción (Editar / Borrar) alineados a la derecha
+                      // Botones de acción (Ver ficha / Editar / Borrar) alineados a la derecha
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
+                            InkWell(
+                              key: const Key('boton-ver-ficha'),
+                              borderRadius: BorderRadius.circular(6),
+                              onTap: onTap ?? () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => PantallaDetalleGallo(gallo: gallo)),
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFF8E1),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFFD4AF37)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.visibility_outlined, size: 14, color: Color(0xFF1E3A8A)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Ver ficha',
+                                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFF1E3A8A)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
                             InkWell(
                               onTap: onEdit,
                               child: Container(
@@ -300,4 +329,4 @@ class TarjetaGallo extends StatelessWidget {
       default: return Colors.grey.shade700;
     }
   }
-}
+}

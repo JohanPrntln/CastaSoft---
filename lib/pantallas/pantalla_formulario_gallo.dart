@@ -31,7 +31,6 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   final TextEditingController _ctrlNombre = TextEditingController();
   final TextEditingController _ctrlLinea = TextEditingController();
   final TextEditingController _ctrlColor = TextEditingController();
-  final TextEditingController _ctrlFase = TextEditingController();
   final TextEditingController _ctrlFecha = TextEditingController();
   
   final TextEditingController _ctrlPesoActual = TextEditingController();
@@ -59,6 +58,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   String? _estado;
   String? _etapaVida;
   String? _tipoCresta;
+  String? _faseLunar;
   DateTime? _fechaNacimiento;
   String? _padreId;
   String? _madreId;
@@ -69,6 +69,30 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
 
   List<String> _listaVacunas = [];
   List<String> _listaPeleas = [];
+
+  // Selectores híbridos (desplegable / escritura manual)
+  static const String _opcionOtro = '➕ Otro (Escribir manualmente...)';
+  static const String _opcionOtraVacuna = '➕ Otra (Escribir manualmente...)';
+  bool _lineaManual = false;
+  bool _colorManual = false;
+
+  // HU-04: evento + fecha de aplicación editable
+  String? _vacunaSeleccionada;
+  bool _vacunaManual = false;
+  DateTime _fechaVacuna = DateTime.now();
+  DateTime _fechaPelea = DateTime.now();
+
+  bool get _esHembra => _sexo == 'Hembra';
+
+  /// Solo acepta pesos con hasta 2 enteros y 2 decimales (coma -> punto).
+  static final TextInputFormatter _formatoPeso = TextInputFormatter.withFunction((viejo, nuevo) {
+    final texto = nuevo.text.replaceAll(',', '.');
+    if (Gallo.formatoPeso.hasMatch(texto)) return nuevo.copyWith(text: texto);
+    // Permite borrar sobre un valor legado que no cumple el formato
+    final viejoInvalido = !Gallo.formatoPeso.hasMatch(viejo.text);
+    if (viejoInvalido && texto.length < viejo.text.length) return nuevo.copyWith(text: texto);
+    return viejo;
+  });
 
   final ImagePicker _picker = ImagePicker();
   bool _estaGuardando = false;
@@ -91,7 +115,10 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     _ctrlNombre.text = g.nombre;
     _ctrlLinea.text = g.lineaGenetica;
     _ctrlColor.text = g.colorPluma;
-    _ctrlFase.text = g.faseLunar;
+    _faseLunar = Gallo.normalizarFaseLunar(g.faseLunar);
+    // Valores antiguos que no pasan la validación se abren en modo manual
+    _lineaManual = g.lineaGenetica.trim().isNotEmpty && Gallo.validarLineaGenetica(g.lineaGenetica) != null;
+    _colorManual = g.colorPluma.trim().isNotEmpty && Gallo.validarColorPluma(g.colorPluma) != null;
     _ctrlFecha.text = _formatearFecha(g.fechaNacimiento);
     
     _ctrlPesoActual.text = g.pesoActual?.toString() ?? '';
@@ -142,7 +169,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   void dispose() {
     _tabController.dispose();
     _ctrlPlaca.dispose(); _ctrlNombre.dispose(); _ctrlLinea.dispose();
-    _ctrlColor.dispose(); _ctrlFase.dispose(); _ctrlFecha.dispose();
+    _ctrlColor.dispose(); _ctrlFecha.dispose();
     _ctrlPesoActual.dispose(); _ctrlPesoCombate.dispose();
     _ctrlJaula.dispose(); _ctrlCriadero.dispose();
     _ctrlNombrePadre.dispose(); _ctrlNombreMadre.dispose();
@@ -179,12 +206,38 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     return double.tryParse(limpio);
   }
   
+  /// Las pestañas no visibles de `TabBarView` no están montadas y el `Form`
+  /// no puede validarlas: se revisan aquí los datos obligatorios.
+  String? _validarDatosObligatorios() {
+    if (_ctrlPlaca.text.trim().isEmpty) return 'La placa / anillo es obligatoria';
+    if (_ctrlNombre.text.trim().isEmpty) return 'El nombre es obligatorio';
+    final errorLinea = Gallo.validarLineaGenetica(_ctrlLinea.text);
+    if (errorLinea != null) return 'Línea Genética: $errorLinea';
+    final errorColor = Gallo.validarColorPluma(_ctrlColor.text);
+    if (errorColor != null) return 'Color Pluma: $errorColor';
+    if (_faseLunar == null) return 'Selecciona la fase lunar';
+    final errorPeso = Gallo.validarPeso(_ctrlPesoActual.text, obligatorio: true);
+    if (errorPeso != null) return 'Peso Actual: $errorPeso';
+    return null;
+  }
+
   Future<void> _guardar() async {
     if (_fechaNacimiento == null) {
       _mostrarSnack('Selecciona fecha de nacimiento', Colors.red);
       return;
     }
     if (!_claveFormulario.currentState!.validate()) return;
+    final errorDatos = _validarDatosObligatorios();
+    if (errorDatos != null) {
+      _tabController.animateTo(0);
+      _mostrarSnack(errorDatos, Colors.red);
+      return;
+    }
+    if (!_esHembra && Gallo.validarPeso(_ctrlPesoCombate.text) != null) {
+      _tabController.animateTo(2);
+      _mostrarSnack('Peso Pactado: ${Gallo.validarPeso(_ctrlPesoCombate.text)}', Colors.red);
+      return;
+    }
 
     // Se capturan ANTES de cualquier await (contexto asíncrono seguro)
     final proveedor = context.read<GallosProveedor>();
@@ -213,7 +266,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         fechaNacimiento: _fechaNacimiento!,
         lineaGenetica: _ctrlLinea.text.trim(),
         colorPluma: _ctrlColor.text.trim(),
-        faseLunar: _ctrlFase.text.trim(),
+        faseLunar: _faseLunar ?? '',
         tipoCresta: _tipoCresta ?? 'Sierra',
         estado: _estado!,
         etapaVida: _etapaVida ?? 'Cría',
@@ -221,7 +274,8 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         jaula: _ctrlJaula.text.isEmpty ? null : _ctrlJaula.text.trim(),
         
         pesoActual: _limpiarNumero(_ctrlPesoActual.text, esDinero: false),
-        pesoCombate: _limpiarNumero(_ctrlPesoCombate.text, esDinero: false),
+        // Las hembras no combaten
+        pesoCombate: _esHembra ? null : _limpiarNumero(_ctrlPesoCombate.text, esDinero: false),
         
         costoAdquisicion: _limpiarNumero(_ctrlCosto.text, esDinero: true),
         precioVenta: _limpiarNumero(_ctrlVenta.text, esDinero: true),
@@ -240,7 +294,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         nombreAbuelaMaterna: _ctrlAbuelaMaterna.text.isEmpty ? null : _ctrlAbuelaMaterna.text,
         
         vacunas: _listaVacunas,
-        peleas: _listaPeleas,
+        peleas: _esHembra ? const [] : _listaPeleas,
       );
 
       // Sin red, el proveedor responde en <= 2.5 s con `confirmado == false`:
@@ -252,8 +306,8 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
       final accion = _esEdicion ? 'actualizado' : 'creado';
       messenger.showSnackBar(SnackBar(
         content: Text(confirmado
-            ? 'Gallo $accion correctamente'
-            : 'Gallo $accion sin conexión: se sincronizará al volver el internet'),
+            ? 'Ejemplar $accion correctamente'
+            : 'Ejemplar $accion sin conexión: se sincronizará al volver el internet'),
         backgroundColor: confirmado ? Colors.green : Colors.orange.shade800,
       ));
       if (mounted) navigator.pop();
@@ -264,6 +318,11 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     }
   }
 
+  String get _tituloAppBar {
+    final accion = _esEdicion ? 'Editar' : 'Registrar';
+    return _esHembra ? '$accion Gallina / Hembra' : '$accion Gallo / Macho';
+  }
+
   void _mostrarSnack(String msj, Color color) {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msj), backgroundColor: color));
   }
@@ -272,7 +331,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_esEdicion ? 'Editar Gallo' : 'Nuevo Gallo'),
+        title: Text(_tituloAppBar),
         backgroundColor: const Color(0xFF1E3A8A),
         bottom: TabBar(
           controller: _tabController,
@@ -372,6 +431,12 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
 
   // PESTAÑA 1
   Widget _buildTabDatos() {
+    final gallos = context.watch<GallosProveedor>().gallos;
+    final opcionesLinea = _opcionesHibridas(
+        Gallo.lineasGeneticasBase, gallos.map((g) => g.lineaGenetica), Gallo.validarLineaGenetica, _ctrlLinea.text);
+    final opcionesColor = _opcionesHibridas(
+        Gallo.coloresPlumaBase, gallos.map((g) => g.colorPluma), Gallo.validarColorPluma, _ctrlColor.text);
+
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
@@ -379,25 +444,60 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         const SizedBox(height: 20),
         _buildCard('Identificación', [
           _buildResponsiveDualInput(
-            _buildInput(_ctrlPlaca, 'Placa / Anillo', icon: FontAwesomeIcons.tag, validacion: true),
-            _buildInput(_ctrlNombre, 'Nombre', icon: FontAwesomeIcons.signature, validacion: true)
+            _buildInput(_ctrlPlaca, 'Placa / Anillo', icon: FontAwesomeIcons.tag, validacion: true, maxLength: 30),
+            _buildInput(_ctrlNombre, 'Nombre', icon: FontAwesomeIcons.signature, validacion: true, maxLength: 40)
           ),
           const SizedBox(height: 15),
           _buildResponsiveDualInput(
-            _buildDropdown('Sexo', ['Macho', 'Hembra'], _sexo, (v) => setState(() => _sexo = v)),
+            _buildDropdown('Sexo', ['Macho', 'Hembra'], _sexo, (v) => setState(() {
+              _sexo = v;
+              // Coherencia biológica: la etapa debe existir para el nuevo sexo
+              if (!Gallo.etapasParaSexo(v).contains(_etapaVida)) _etapaVida = 'Cría';
+            })),
             _buildInput(_ctrlFecha, 'Fec. Nacimiento', icon: FontAwesomeIcons.calendar, readOnly: true, onTap: _seleccionarFecha)
           ),
         ]),
         const SizedBox(height: 15),
         _buildCard('Genética y Físico', [
           _buildResponsiveDualInput(
-            _buildInput(_ctrlLinea, 'Línea Genética', icon: FontAwesomeIcons.dna, validacion: true),
-            _buildInput(_ctrlColor, 'Color Pluma', icon: FontAwesomeIcons.palette, validacion: true)
+            _buildSelectorHibrido(
+              claveBase: 'linea',
+              label: 'Línea Genética',
+              icon: FontAwesomeIcons.dna,
+              ctrl: _ctrlLinea,
+              opciones: opcionesLinea,
+              manual: _lineaManual,
+              alCambiarModo: (m) => _lineaManual = m,
+              maxLength: 40,
+              validar: Gallo.validarLineaGenetica,
+            ),
+            _buildSelectorHibrido(
+              claveBase: 'color',
+              label: 'Color Pluma',
+              icon: FontAwesomeIcons.palette,
+              ctrl: _ctrlColor,
+              opciones: opcionesColor,
+              manual: _colorManual,
+              alCambiarModo: (m) => _colorManual = m,
+              maxLength: 30,
+              validar: Gallo.validarColorPluma,
+              formatters: [FilteringTextInputFormatter.allow(Gallo.caracteresColorPluma)],
+            ),
           ),
           const SizedBox(height: 15),
           _buildResponsiveDualInput(
             _buildDropdown('Cresta', ['Sierra', 'Rosa', 'Pava', 'Boton', 'Simple'], _tipoCresta, (v) => setState(() => _tipoCresta = v)),
-            _buildInput(_ctrlFase, 'Fase Lunar', icon: FontAwesomeIcons.moon, validacion: true)
+            _buildDropdown('Fase Lunar', Gallo.opcionesFaseLunar(_faseLunar), _faseLunar, (v) => setState(() => _faseLunar = v),
+                icon: FontAwesomeIcons.moon, validator: (v) => v == null ? 'Requerido' : null),
+          ),
+          const SizedBox(height: 15),
+          _buildInput(
+            _ctrlPesoActual, 'Peso Actual (Lbs)',
+            key: const Key('campo-peso-actual'),
+            isNumber: true,
+            icon: FontAwesomeIcons.weightScale,
+            formatters: [_formatoPeso],
+            validator: (v) => Gallo.validarPeso(v, obligatorio: true),
           ),
         ]),
         const SizedBox(height: 60), 
@@ -486,8 +586,9 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
 
   // PESTAÑA 3
   Widget _buildTabGestion() {
-    // 🔥 Truco Anti-Crash: Lista nueva, pero agregamos la vieja temporalmente si la tiene
-    final List<String> etapasFormulario = List.of(Gallo.etapasVida);
+    // Etapas según el sexo; si un registro antiguo trae otra (p. ej. legada)
+    // se agrega temporalmente para no romper el desplegable.
+    final List<String> etapasFormulario = List.of(Gallo.etapasParaSexo(_sexo));
     if (_etapaVida != null && !etapasFormulario.contains(_etapaVida)) {
       etapasFormulario.add(_etapaVida!); 
     }
@@ -498,25 +599,34 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         _buildCard('Estado Actual', [
           _buildResponsiveDualInput(
             _buildDropdown('Estado', Gallo.estadosValidos, _estado, (v) => setState(() => _estado = v)),
-            // Pasamos la lista dinámica en vez de la estática
             _buildDropdown('Etapa', etapasFormulario, _etapaVida, (v) => setState(() => _etapaVida = v))
           ),
           const SizedBox(height: 15),
-          _buildResponsiveDualInput(
-            _buildInput(_ctrlPesoActual, 'Peso Actual (Lbs)', isNumber: true, icon: FontAwesomeIcons.weightScale),
-            _buildInput(_ctrlPesoCombate, 'Peso Pactado (Lbs)', isNumber: true, icon: FontAwesomeIcons.dumbbell)
-          ),
-          const SizedBox(height: 15),
-          _buildInput(_ctrlJaula, 'Jaula / Ubicación'),
+          if (_esHembra)
+            _buildInput(_ctrlJaula, 'Jaula / Ubicación', maxLength: 20)
+          else
+            _buildResponsiveDualInput(
+              _buildInput(
+                _ctrlPesoCombate, 'Peso Pactado (Lbs)',
+                key: const Key('campo-peso-pactado'),
+                isNumber: true,
+                icon: FontAwesomeIcons.dumbbell,
+                formatters: [_formatoPeso],
+                validator: (v) => Gallo.validarPeso(v),
+              ),
+              _buildInput(_ctrlJaula, 'Jaula / Ubicación', maxLength: 20),
+            ),
         ]),
         const SizedBox(height: 20),
-        _buildCard('Vacunas', [
-          _buildListaDinamica(_ctrlNuevaVacuna, _listaVacunas, 'Agregar Vacuna'),
+        _buildCard('Vacunas / Historial Sanitario', [
+          _buildSeccionVacunas(),
         ]),
-        const SizedBox(height: 20),
-        _buildCard('Peleas', [
-          _buildListaDinamica(_ctrlNuevaPelea, _listaPeleas, 'Agregar Pelea'),
-        ]),
+        if (!_esHembra) ...[
+          const SizedBox(height: 20),
+          _buildCard('Historial de Peleas', [
+            _buildSeccionPeleas(),
+          ]),
+        ],
         const SizedBox(height: 60),
       ],
     );
@@ -533,14 +643,14 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
             _buildInput(_ctrlVenta, 'Precio Venta', isNumber: true, isMoney: true, icon: Icons.attach_money)
           ),
           const SizedBox(height: 15),
-          _buildInput(_ctrlCriadero, 'Criadero de Origen'),
+          _buildInput(_ctrlCriadero, 'Criadero de Origen', maxLength: 40),
         ]),
         const SizedBox(height: 20),
         _buildCard('Multimedia y Notas', [
           // 🔥 CAMBIO: Etiqueta general para cualquier enlace
           _buildInput(_ctrlVideo, 'Enlace (YouTube, Drive, Telegram)', icon: FontAwesomeIcons.link),
           const SizedBox(height: 15),
-          _buildInput(_ctrlNotas, 'Notas', maxLines: 3),
+          _buildInput(_ctrlNotas, 'Notas', maxLines: 3, maxLength: 300),
         ]),
         const SizedBox(height: 60),
       ],
@@ -566,15 +676,21 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   Widget _buildInput(
     TextEditingController ctrl, 
     String label, {
+      Key? key,
       dynamic icon, 
       bool isNumber = false, 
       bool isMoney = false, 
       bool validacion = false, 
       int maxLines = 1, 
+      int? maxLength,
       bool readOnly = false, 
-      VoidCallback? onTap
+      VoidCallback? onTap,
+      List<TextInputFormatter>? formatters,
+      String? Function(String?)? validator,
+      Widget? suffixIcon,
     }) {
     return TextFormField(
+      key: key,
       controller: ctrl,
       keyboardType: isNumber 
           ? const TextInputType.numberWithOptions(decimal: true) 
@@ -582,63 +698,245 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
       readOnly: readOnly,
       onTap: onTap,
       maxLines: maxLines,
+      maxLength: maxLength,
       inputFormatters: isMoney 
           ? [FilteringTextInputFormatter.digitsOnly, CurrencyInputFormatter()] 
-          : null,
-      decoration: _inputDeco(label, icon: icon),
-      validator: validacion ? (v) => (v == null || v.isEmpty) ? 'Requerido' : null : null,
+          : formatters,
+      decoration: _inputDeco(label, icon: icon, suffixIcon: suffixIcon),
+      validator: validator ??
+          (validacion ? (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null : null),
     );
   }
 
-  InputDecoration _inputDeco(String label, {dynamic icon}) {
+  InputDecoration _inputDeco(String label, {dynamic icon, Widget? suffixIcon}) {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(fontSize: 13),
       prefixIcon: icon != null 
           ? IconoAdaptativo.prefijo(icon, size: 18, color: const Color(0xFF1E3A8A))
           : null,
+      suffixIcon: suffixIcon,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
     );
-}
-  Widget _buildDropdown(String label, List<String> items, String? valor, Function(String?) onChanged) {
+  }
+
+  Widget _buildDropdown(String label, List<String> items, String? valor, Function(String?) onChanged,
+      {dynamic icon, String? Function(String?)? validator}) {
     return DropdownButtonFormField<String>(
       // Key ligada al valor: si el estado cambia por código, el campo se recrea
       key: ValueKey('$label-$valor'),
       isExpanded: true,
       initialValue: items.contains(valor) ? valor : null,
-      decoration: _inputDeco(label),
+      decoration: _inputDeco(label, icon: icon),
       items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 14)))).toList(),
       onChanged: onChanged,
+      validator: validator,
     );
   }
 
-  Widget _buildListaDinamica(TextEditingController ctrl, List<String> lista, String hint) {
+  /// Catálogo base + valores válidos ya usados en el criadero + "Otro".
+  List<String> _opcionesHibridas(
+      List<String> base, Iterable<String> existentes, String? Function(String?) validar, String actual) {
+    final opciones = List<String>.of(base);
+    final extras = <String>{};
+    for (final valor in [...existentes, actual]) {
+      final limpio = valor.trim();
+      if (limpio.isNotEmpty && !opciones.contains(limpio) && validar(limpio) == null) extras.add(limpio);
+    }
+    opciones.addAll(extras.toList()..sort());
+    opciones.add(_opcionOtro);
+    return opciones;
+  }
+
+  /// Desplegable con opciones comunes que se convierte en texto libre al
+  /// elegir "Otro"; la X del campo manual regresa al desplegable.
+  Widget _buildSelectorHibrido({
+    required String claveBase,
+    required String label,
+    required dynamic icon,
+    required TextEditingController ctrl,
+    required List<String> opciones,
+    required bool manual,
+    required ValueChanged<bool> alCambiarModo,
+    required int maxLength,
+    required String? Function(String?) validar,
+    List<TextInputFormatter>? formatters,
+  }) {
+    if (manual) {
+      return _buildInput(
+        ctrl, label,
+        key: Key('$claveBase-manual'),
+        icon: icon,
+        maxLength: maxLength,
+        formatters: formatters,
+        validator: validar,
+        suffixIcon: IconButton(
+          key: Key('$claveBase-volver-lista'),
+          tooltip: 'Volver a la lista',
+          icon: const Icon(Icons.close),
+          onPressed: () => setState(() {
+            alCambiarModo(false);
+            if (!opciones.contains(ctrl.text.trim())) ctrl.clear();
+          }),
+        ),
+      );
+    }
+    final actual = ctrl.text.trim();
+    return DropdownButtonFormField<String>(
+      key: ValueKey('$claveBase-$actual'),
+      isExpanded: true,
+      initialValue: opciones.contains(actual) ? actual : null,
+      decoration: _inputDeco(label, icon: icon),
+      items: opciones
+          .map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14))))
+          .toList(),
+      onChanged: (v) => setState(() {
+        if (v == _opcionOtro) {
+          alCambiarModo(true);
+          ctrl.clear();
+        } else {
+          ctrl.text = v ?? '';
+        }
+      }),
+      validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
+    );
+  }
+
+  Widget _buildSelectorFechaEvento(DateTime fecha, ValueChanged<DateTime> alCambiar, {required Key key}) {
+    return TextButton.icon(
+      key: key,
+      onPressed: () async {
+        final elegida = await showDatePicker(
+          context: context,
+          initialDate: fecha,
+          firstDate: DateTime(2000),
+          lastDate: DateTime.now(),
+        );
+        if (elegida != null) setState(() => alCambiar(elegida));
+      },
+      icon: const Icon(Icons.event, size: 18, color: Color(0xFF1E3A8A)),
+      label: Text(DateFormat('dd/MM/yyyy').format(fecha), style: const TextStyle(color: Color(0xFF1E3A8A))),
+    );
+  }
+
+  Widget _buildSeccionVacunas() {
+    final Widget campo = _vacunaManual
+        ? TextFormField(
+            key: const Key('vacuna-manual'),
+            controller: _ctrlNuevaVacuna,
+            maxLength: 60,
+            decoration: _inputDeco(
+              'Vacuna / tratamiento',
+              suffixIcon: IconButton(
+                tooltip: 'Volver a la lista',
+                icon: const Icon(Icons.close),
+                onPressed: () => setState(() {
+                  _vacunaManual = false;
+                  _ctrlNuevaVacuna.clear();
+                }),
+              ),
+            ),
+          )
+        : DropdownButtonFormField<String>(
+            key: ValueKey('vacuna-$_vacunaSeleccionada'),
+            isExpanded: true,
+            initialValue: _vacunaSeleccionada,
+            decoration: _inputDeco('Agregar Vacuna'),
+            items: [...Gallo.vacunasComunes, _opcionOtraVacuna]
+                .map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14))))
+                .toList(),
+            onChanged: (v) => setState(() {
+              if (v == _opcionOtraVacuna) {
+                _vacunaManual = true;
+                _vacunaSeleccionada = null;
+              } else {
+                _vacunaSeleccionada = v;
+              }
+            }),
+          );
+
     return Column(
       children: [
+        campo,
         Row(children: [
-          Expanded(child: TextFormField(controller: ctrl, decoration: _inputDeco(hint))),
+          _buildSelectorFechaEvento(_fechaVacuna, (f) => _fechaVacuna = f, key: const Key('fecha-vacuna')),
+          const Spacer(),
           IconButton(
+            key: const Key('agregar-vacuna'),
+            tooltip: 'Agregar vacuna',
             icon: const Icon(Icons.add_circle, color: Color(0xFF1E3A8A)),
-            onPressed: () {
-              // RN-07: prohibido insertar strings vacíos (o solo espacios)
-              final texto = ctrl.text.trim();
-              if (texto.isNotEmpty) {
-                setState(() => lista.add(texto));
-              }
-              ctrl.clear();
-            },
-          )
+            onPressed: _agregarVacuna,
+          ),
         ]),
-        Wrap(
-          spacing: 8,
-          children: lista.map((e) => Chip(
-            label: Text(e),
-            deleteIcon: const Icon(Icons.close, size: 16),
-            onDeleted: () => setState(() => lista.remove(e)),
-          )).toList(),
-        )
+        _buildChipsEventos(_listaVacunas),
       ],
+    );
+  }
+
+  Widget _buildSeccionPeleas() {
+    return Column(
+      children: [
+        TextFormField(
+          key: const Key('pelea-texto'),
+          controller: _ctrlNuevaPelea,
+          maxLength: 100,
+          decoration: _inputDeco('Agregar Pelea (Ej: Ganó en 12 min)'),
+        ),
+        Row(children: [
+          _buildSelectorFechaEvento(_fechaPelea, (f) => _fechaPelea = f, key: const Key('fecha-pelea')),
+          const Spacer(),
+          IconButton(
+            key: const Key('agregar-pelea'),
+            tooltip: 'Agregar pelea',
+            icon: const Icon(Icons.add_circle, color: Color(0xFF1E3A8A)),
+            onPressed: _agregarPelea,
+          ),
+        ]),
+        _buildChipsEventos(_listaPeleas),
+      ],
+    );
+  }
+
+  void _agregarVacuna() {
+    final evento = (_vacunaManual ? _ctrlNuevaVacuna.text : (_vacunaSeleccionada ?? '')).trim();
+    // RN-07: prohibido insertar strings vacíos (o solo espacios)
+    if (evento.isEmpty) {
+      _mostrarSnack('Selecciona o escribe una vacuna', Colors.red);
+      return;
+    }
+    setState(() {
+      _listaVacunas.add(Gallo.eventoConFecha(evento, _fechaVacuna));
+      _vacunaSeleccionada = null;
+      _ctrlNuevaVacuna.clear();
+      _fechaVacuna = DateTime.now();
+    });
+  }
+
+  void _agregarPelea() {
+    final evento = _ctrlNuevaPelea.text.trim();
+    if (evento.isEmpty) {
+      _mostrarSnack('Describe la pelea antes de agregarla', Colors.red);
+      return;
+    }
+    setState(() {
+      _listaPeleas.add(Gallo.eventoConFecha(evento, _fechaPelea));
+      _ctrlNuevaPelea.clear();
+      _fechaPelea = DateTime.now();
+    });
+  }
+
+  Widget _buildChipsEventos(List<String> lista) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Wrap(
+        spacing: 8,
+        children: lista.map((e) => Chip(
+          label: Text(e),
+          deleteIcon: const Icon(Icons.close, size: 16),
+          onDeleted: () => setState(() => lista.remove(e)),
+        )).toList(),
+      ),
     );
   }
 
@@ -675,4 +973,4 @@ class CurrencyInputFormatter extends TextInputFormatter {
       selection: TextSelection.collapsed(offset: newText.length),
     );
   }
-}
+}
