@@ -80,14 +80,10 @@ class Gallo {
   }
 
   /// Líneas genéticas sugeridas en el selector del formulario.
-  static const List<String> lineasGeneticasBase = [
-    'Kelso', 'Hatch', 'Sweater', 'Albany', 'Giro', 'Claret', 'Asil', 'Radio', 'Roundhead', 'Regular / Propia',
-  ];
+  static const List<String> lineasGeneticasBase = ['Kelso', 'Hatch', 'Sweater', 'Albany', 'Giro', 'Claret'];
 
   /// Colores de pluma sugeridos en el selector del formulario.
-  static const List<String> coloresPlumaBase = [
-    'Giro', 'Cenizo', 'Colorado', 'Grillo', 'Pinto', 'Negro', 'Blanco', 'Jabao', 'Canelo', 'Gallino', 'Mixto',
-  ];
+  static const List<String> coloresPlumaBase = ['Giro', 'Cenizo', 'Colorado', 'Grillo', 'Pinto', 'Negro', 'Blanco'];
 
   /// Vacunas / tratamientos avícolas sugeridos (HU-04).
   static const List<String> vacunasComunes = [
@@ -99,47 +95,88 @@ class Gallo {
   static const double pesoMinimoLbs = 0.1;
   static const double pesoMaximoLbs = 25.0;
 
+  static final RegExp _palabraReal = RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ]{3,}');
   static final RegExp _letra = RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ]');
-  static final RegExp _dosLetras = RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ]{2,}');
+  static final RegExp _cincoDigitos = RegExp(r'\d{5,}');
+  static final RegExp _fechaEnTexto = RegExp(r'\(?\s*\d{1,2}\s*[\/\-.]\s*\d{1,2}\s*[\/\-.]\s*\d{2,4}\s*\)?');
 
-  /// Caracteres permitidos al escribir un color de pluma (sin números).
-  static final RegExp caracteresColorPluma = RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s\/\-]');
+  /// Caracteres permitidos al escribir una línea genética (ej: "F1 Hatch 50%").
+  static final RegExp caracteresLineaGenetica = RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9\s\-\/xX%]');
+
+  /// Caracteres permitidos al escribir un color de pluma: letras, espacios y guiones.
+  static final RegExp caracteresColorPluma = RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑ\s\-]');
 
   /// Formato de peso: hasta 2 enteros y 2 decimales.
   static final RegExp formatoPeso = RegExp(r'^\d{0,2}(\.\d{0,2})?$');
+
+  static const String mensajePesoInvalido = 'El peso debe ser mayor a 0.1 y menor o igual a 25.0 Lbs';
+  static const String mensajeLineaInvalida = 'Ingresa una línea genética válida (ej: Kelso, F1 Hatch 50%)';
+  static const String mensajeColorInvalido = 'Ingresa un color válido usando solo letras (mínimo 3)';
+  static const String mensajeEnlaceInvalido = 'Ingresa un enlace web válido que inicie con https:// o http://';
+
+  static bool _soloCaracteres(String texto, RegExp permitidos) =>
+      texto.split('').every(permitidos.hasMatch);
+
+  static bool _tienePalabraLarga(String texto) => texto.split(RegExp(r'\s+')).any((p) => p.length > 15);
 
   /// Peso en Lbs dentro del rango biológico (> 0.1 y <= 25.0).
   static String? validarPeso(String? valor, {bool obligatorio = false}) {
     final texto = valor?.trim().replaceAll(',', '.') ?? '';
     if (texto.isEmpty) return obligatorio ? 'Requerido' : null;
     final peso = double.tryParse(texto);
-    if (peso == null) return 'Número inválido';
-    if (peso <= pesoMinimoLbs || peso > pesoMaximoLbs) {
-      return 'Debe ser > $pesoMinimoLbs y <= $pesoMaximoLbs Lbs';
+    if (peso == null || peso <= pesoMinimoLbs || peso > pesoMaximoLbs) return mensajePesoInvalido;
+    return null;
+  }
+
+  /// Color de pluma escrito a mano: 3-25 caracteres, solo letras/espacios/guiones.
+  static String? validarColorPluma(String? valor) {
+    final texto = valor?.trim() ?? '';
+    if (texto.isEmpty) return 'Requerido';
+    if (texto.length < 3 || texto.length > 25 ||
+        !_soloCaracteres(texto, caracteresColorPluma) ||
+        _letra.allMatches(texto).length < 3 ||
+        _tienePalabraLarga(texto)) {
+      return mensajeColorInvalido;
     }
     return null;
   }
 
-  /// Color de pluma escrito a mano: solo letras y mínimo 3 de ellas.
-  static String? validarColorPluma(String? valor) {
-    final texto = valor?.trim() ?? '';
-    if (texto.isEmpty) return 'Requerido';
-    if (texto.split('').any((c) => !caracteresColorPluma.hasMatch(c))) return 'Solo letras';
-    if (_letra.allMatches(texto).length < 3) return 'Mínimo 3 letras';
-    return null;
-  }
-
-  /// Línea genética escrita a mano: admite "F1 Kelso 50%", pero exige 2 letras seguidas.
+  /// Línea genética escrita a mano: 3-30 caracteres, al menos una palabra de
+  /// 3 letras seguidas, sin rachas de 5+ dígitos ni palabras de 16+ caracteres.
   static String? validarLineaGenetica(String? valor) {
     final texto = valor?.trim() ?? '';
     if (texto.isEmpty) return 'Requerido';
-    if (!_dosLetras.hasMatch(texto)) return 'Debe contener al menos 2 letras';
+    if (texto.length < 3 || texto.length > 30 ||
+        !_soloCaracteres(texto, caracteresLineaGenetica) ||
+        !_palabraReal.hasMatch(texto) ||
+        _cincoDigitos.hasMatch(texto) ||
+        _tienePalabraLarga(texto)) {
+      return mensajeLineaInvalida;
+    }
     return null;
   }
 
-  /// Texto de un evento del historial con su fecha (HU-04).
+  /// Enlace opcional: si se escribe, debe ser http(s) con un dominio válido.
+  static String? validarEnlace(String? valor) {
+    final texto = valor?.trim() ?? '';
+    if (texto.isEmpty) return null;
+    final uri = Uri.tryParse(texto);
+    final valido = uri != null &&
+        uri.hasScheme &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.contains('.') &&
+        !uri.host.startsWith('.') &&
+        !uri.host.endsWith('.');
+    return valido ? null : mensajeEnlaceInvalido;
+  }
+
+  /// Quita fechas escritas a mano (dd/mm/yyyy, dd-mm-yy...) de un evento.
+  static String quitarFechas(String texto) =>
+      texto.replaceAll(_fechaEnTexto, ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  /// Texto de un evento del historial con su fecha (HU-04), sin fechas duplicadas.
   static String eventoConFecha(String evento, DateTime fecha) =>
-      '${evento.trim()} (${DateFormat('dd/MM/yyyy').format(fecha)})';
+      '${quitarFechas(evento)} (${DateFormat('dd/MM/yyyy').format(fecha)})';
 
   // ==================== 1. IDENTIFICACIÓN ====================
   final String id;

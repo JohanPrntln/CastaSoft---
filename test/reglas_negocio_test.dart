@@ -15,6 +15,30 @@ import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/pantallas/pantalla_formulario_gallo.dart';
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
 
+Gallo galloCompleto({
+  String id = 'gc',
+  String placa = 'C3',
+  String? videoUrl,
+  String? nombrePadre,
+  String? jaula,
+  double? costo,
+}) =>
+    Gallo(
+      id: id, placa: placa, nombre: 'Centella', sexo: 'Macho', fechaNacimiento: DateTime(2024),
+      lineaGenetica: 'Kelso', colorPluma: 'Giro', faseLunar: 'Luna llena', estado: 'Activo', etapaVida: 'Padrote',
+      pesoActual: 5.0, videoUrl: videoUrl, nombrePadre: nombrePadre, jaula: jaula, costoAdquisicion: costo,
+    );
+
+extension on Gallo {
+  Gallo copyWithLineaColor(String linea, String color) {
+    final mapa = toMap()
+      ..['id'] = id
+      ..['lineaGenetica'] = linea
+      ..['colorPluma'] = color;
+    return Gallo.fromMap(mapa);
+  }
+}
+
 void main() {
   GoogleFonts.config.allowRuntimeFetching = false;
 
@@ -156,6 +180,14 @@ void main() {
       expect(Gallo.validarPeso('', obligatorio: true), 'Requerido');
       expect(Gallo.validarPeso(''), isNull);
     });
+    test('peso: mensaje de error humano, sin símbolos matemáticos', () {
+      const mensaje = 'El peso debe ser mayor a 0.1 y menor o igual a 25.0 Lbs';
+      expect(Gallo.validarPeso('30'), mensaje);
+      expect(Gallo.validarPeso('0.1', obligatorio: true), mensaje);
+      expect(Gallo.validarPeso('abc'), mensaje);
+      expect(mensaje, isNot(contains('>')));
+      expect(mensaje, isNot(contains('<')));
+    });
     test('formato de peso: hasta 2 enteros y 2 decimales, sin signos', () {
       expect(Gallo.formatoPeso.hasMatch('12.34'), isTrue);
       expect(Gallo.formatoPeso.hasMatch('123'), isFalse);
@@ -163,24 +195,59 @@ void main() {
       expect(Gallo.formatoPeso.hasMatch('-5'), isFalse);
       expect(Gallo.formatoPeso.hasMatch('+5'), isFalse);
     });
-    test('color pluma: rechaza números y exige 3 letras', () {
+    test('color pluma anti-basura: solo letras/espacios/guiones, 3-25 caracteres', () {
+      const mensaje = 'Ingresa un color válido usando solo letras (mínimo 3)';
       expect(Gallo.validarColorPluma('Giro'), isNull);
-      expect(Gallo.validarColorPluma('Negro / Blanco'), isNull);
-      expect(Gallo.validarColorPluma('Giro2'), isNotNull);
-      expect(Gallo.validarColorPluma('123'), isNotNull);
-      expect(Gallo.validarColorPluma('ab'), isNotNull);
-      expect(Gallo.validarColorPluma('   '), isNotNull);
+      expect(Gallo.validarColorPluma('Negro - Blanco'), isNull);
+      expect(Gallo.validarColorPluma('Cenizo Colorado'), isNull);
+      expect(Gallo.validarColorPluma('Giro2'), mensaje);
+      expect(Gallo.validarColorPluma('Negro / Blanco'), mensaje);
+      expect(Gallo.validarColorPluma('"Giro"'), mensaje);
+      expect(Gallo.validarColorPluma('123'), mensaje);
+      expect(Gallo.validarColorPluma('ab'), mensaje);
+      expect(Gallo.validarColorPluma('Abcdefghijklmnopq'), mensaje); // palabra de 17 letras
+      expect(Gallo.validarColorPluma('Giro Cenizo Colorado Negro'), mensaje); // 26 caracteres
+      expect(Gallo.validarColorPluma('   '), 'Requerido');
     });
-    test('línea genética: admite cruces filiales y rechaza solo números/símbolos', () {
+    test('línea genética anti-basura: admite cruces filiales y rechaza texto sin sentido', () {
+      const mensaje = 'Ingresa una línea genética válida (ej: Kelso, F1 Hatch 50%)';
       expect(Gallo.validarLineaGenetica('F1 Kelso 50%'), isNull);
+      expect(Gallo.validarLineaGenetica('F1 Hatch 50%'), isNull);
+      expect(Gallo.validarLineaGenetica('Kelso x Hatch'), isNull);
+      expect(Gallo.validarLineaGenetica('Sweater/Albany 1/2'), isNull);
       expect(Gallo.validarLineaGenetica('Hatch'), isNull);
-      expect(Gallo.validarLineaGenetica('12345'), isNotNull);
-      expect(Gallo.validarLineaGenetica('50% - 25%'), isNotNull);
-      expect(Gallo.validarLineaGenetica('F1'), isNotNull);
-      expect(Gallo.validarLineaGenetica(''), isNotNull);
+      expect(Gallo.validarLineaGenetica('265154545454545222222d2df2dlf5e"W"rwe'), mensaje);
+      expect(Gallo.validarLineaGenetica('Kelso!!'), mensaje);
+      expect(Gallo.validarLineaGenetica('Kelso 123456'), mensaje); // 5+ dígitos seguidos
+      expect(Gallo.validarLineaGenetica('Supercalifragilistico'), mensaje); // palabra de 21 letras
+      expect(Gallo.validarLineaGenetica('Kelso Hatch Sweater Albany Giro'), mensaje); // 31 caracteres
+      expect(Gallo.validarLineaGenetica('12345'), mensaje);
+      expect(Gallo.validarLineaGenetica('50% - 25%'), mensaje);
+      expect(Gallo.validarLineaGenetica('F1'), mensaje);
+      expect(Gallo.validarLineaGenetica('F1 Ke'), mensaje); // sin palabra de 3 letras
+      expect(Gallo.validarLineaGenetica(''), 'Requerido');
     });
-    test('HU-04: evento + fecha', () {
-      expect(Gallo.eventoConFecha('  Newcastle ', DateTime(2026, 3, 7)), 'Newcastle (07/03/2026)');
+    test('enlace de video: opcional, pero si existe debe ser http(s) con dominio', () {
+      const mensaje = 'Ingresa un enlace web válido que inicie con https:// o http://';
+      expect(Gallo.validarEnlace(''), isNull);
+      expect(Gallo.validarEnlace('   '), isNull);
+      expect(Gallo.validarEnlace(null), isNull);
+      expect(Gallo.validarEnlace('https://www.youtube.com/watch?v=abc'), isNull);
+      expect(Gallo.validarEnlace('http://drive.google.com/file/d/1'), isNull);
+      expect(Gallo.validarEnlace('https://t.me/criadero'), isNull);
+      expect(Gallo.validarEnlace('12345'), mensaje);
+      expect(Gallo.validarEnlace('hola'), mensaje);
+      expect(Gallo.validarEnlace('www.youtube.com'), mensaje);
+      expect(Gallo.validarEnlace('ftp://archivos.com'), mensaje);
+      expect(Gallo.validarEnlace('https://localhost'), mensaje);
+      expect(Gallo.validarEnlace('https://'), mensaje);
+    });
+    test('HU-04: evento + fecha, sin fechas duplicadas', () {
+      final fecha = DateTime(2026, 3, 7);
+      expect(Gallo.eventoConFecha('  Newcastle ', fecha), 'Newcastle (07/03/2026)');
+      expect(Gallo.eventoConFecha('Newcastle 01/02/2026', fecha), 'Newcastle (07/03/2026)');
+      expect(Gallo.eventoConFecha('Gumboro (1-2-25)', fecha), 'Gumboro (07/03/2026)');
+      expect(Gallo.quitarFechas('15/01/2026'), '');
     });
   });
 
@@ -236,9 +303,11 @@ void main() {
       // Fase lunar antigua normalizada
       expect(find.text('Luna llena'), findsOneWidget);
 
+      // Estado y Etapa de Vida viven en la pestaña Datos
+      expect(find.text('Etapa de Vida'), findsOneWidget);
+      expect(find.text('Combate'), findsOneWidget);
       await elegir(tester, 'Macho', 'Hembra');
       expect(find.text('Editar Gallina / Hembra'), findsOneWidget);
-      await irAGestion(tester);
       expect(find.text('Combate'), findsNothing);
       expect(find.text('Cría'), findsOneWidget);
     });
@@ -251,7 +320,6 @@ void main() {
       await abrirFormulario(tester, galloEditar: hembra);
       expect(tester.takeException(), isNull);
       expect(find.text('Eclipse'), findsOneWidget);
-      await irAGestion(tester);
       expect(find.text('Levante'), findsOneWidget);
     });
 
@@ -272,6 +340,113 @@ void main() {
       await tester.tap(find.byKey(const Key('color-volver-lista')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('color-manual')), findsNothing);
+    });
+
+    testWidgets('Línea/Color solo muestran el catálogo corto, sin histórico del proveedor', (tester) async {
+      final otro = galloCompleto(id: 'otro', placa: 'Z9').copyWithLineaColor('Linea Sucia Vieja', 'Color Raro');
+      tester.view.physicalSize = const Size(1200, 3200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(ChangeNotifierProvider<GallosProveedor>(
+        create: (_) => GallosProveedor.enMemoria([otro]),
+        child: const MaterialApp(home: PantallaFormularioGallo()),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Línea Genética'));
+      await tester.pumpAndSettle();
+      for (final l in ['Kelso', 'Hatch', 'Sweater', 'Albany', 'Claret', '➕ Otro (Escribir manualmente...)']) {
+        expect(find.text(l), findsWidgets);
+      }
+      expect(find.text('Linea Sucia Vieja'), findsNothing);
+      expect(find.text('Asil'), findsNothing);
+      await tester.tap(find.text('Kelso').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Color Pluma'));
+      await tester.pumpAndSettle();
+      expect(find.text('Cenizo'), findsWidgets);
+      expect(find.text('Color Raro'), findsNothing);
+      expect(find.text('Jabao'), findsNothing);
+    });
+
+    testWidgets('edición: un valor guardado fuera del catálogo se conserva en el desplegable', (tester) async {
+      final legado = galloCompleto().copyWithLineaColor('¡Radio Viejo!', 'Jabao');
+      await abrirFormulario(tester, galloEditar: legado);
+      expect(tester.takeException(), isNull);
+      expect(find.text('¡Radio Viejo!'), findsOneWidget);
+      expect(find.text('Jabao'), findsOneWidget);
+    });
+
+    testWidgets('Línea Genética manual bloquea comillas y símbolos raros', (tester) async {
+      await abrirFormulario(tester);
+      await elegir(tester, 'Línea Genética', '➕ Otro (Escribir manualmente...)');
+      final linea = find.byKey(const Key('linea-manual'));
+      await tester.enterText(linea, 'F1 "Hatch"! 50%');
+      expect(tester.widget<TextFormField>(linea).controller!.text, 'F1 Hatch 50%');
+    });
+
+    testWidgets('enlace inválido bloquea el guardado y lleva a su pestaña', (tester) async {
+      await abrirFormulario(tester, galloEditar: galloCompleto(videoUrl: 'hola'));
+      await tester.tap(find.text('GUARDAR'));
+      await tester.pumpAndSettle();
+      expect(find.text('Multimedia y Notas'), findsOneWidget);
+      expect(find.text('Ingresa un enlace web válido que inicie con https:// o http://'), findsWidgets);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('confirmación: lista las secciones vacías y "No" lleva a la primera', (tester) async {
+      await abrirFormulario(tester, galloEditar: galloCompleto());
+      await tester.tap(find.text('GUARDAR'));
+      await tester.pumpAndSettle();
+      expect(find.text('¿Guardar ejemplar?'), findsOneWidget);
+      expect(
+        find.text('¿Estás seguro de que quieres guardar sin haber completado o revisado la información '
+            'en las secciones de Genealogía, Gestión y Finanzas?'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('No, quiero seguir editando'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('Padres en el Sistema'), findsOneWidget);
+    });
+
+    testWidgets('confirmación: solo menciona las secciones vacías y "Sí" continúa el guardado', (tester) async {
+      await abrirFormulario(tester, galloEditar: galloCompleto(nombrePadre: 'Rayo', jaula: 'J-1'));
+      await tester.tap(find.text('GUARDAR'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('¿Estás seguro de que quieres guardar sin haber completado o revisado la información '
+            'en la sección de Finanzas?'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Sí, estoy seguro, guardar'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      // Sin Firebase en las pruebas, el intento de guardado termina en un SnackBar
+      expect(find.byType(SnackBar), findsOneWidget);
+    });
+
+    testWidgets('sin secciones vacías se guarda sin preguntar', (tester) async {
+      await abrirFormulario(
+        tester,
+        galloEditar: galloCompleto(nombrePadre: 'Rayo', jaula: 'J-1', costo: 50000),
+      );
+      await tester.tap(find.text('GUARDAR'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(SnackBar), findsOneWidget);
+    });
+
+    testWidgets('botón de fecha visible en vacunas y peleas, y sin "/" en el texto', (tester) async {
+      await abrirFormulario(tester);
+      await irAGestion(tester);
+      final hoy = DateFormat('dd/MM/yyyy').format(DateTime.now());
+      expect(find.text('📅 Fecha: $hoy (Cambiar)'), findsNWidgets(2));
+      expect(find.widgetWithText(OutlinedButton, '📅 Fecha: $hoy (Cambiar)'), findsNWidgets(2));
+      final pelea = find.byKey(const Key('pelea-texto'));
+      await tester.enterText(pelea, 'Ganó 12/03/2026');
+      expect(tester.widget<TextFormField>(pelea).controller!.text, 'Ganó 12032026');
     });
 
     testWidgets('HU-04: agregar vacuna concatena la fecha seleccionada', (tester) async {
