@@ -462,8 +462,9 @@ class PantallaDetalleGallo extends StatelessWidget {
             children: [
               Text(rol, style: const TextStyle(fontSize: 10, color: Colors.grey)),
               Text(
-                nombre, 
+                nombre,
                 style: const TextStyle(fontWeight: FontWeight.bold),
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
             ],
@@ -477,8 +478,9 @@ class PantallaDetalleGallo extends StatelessWidget {
     return Align(
       alignment: Alignment.centerLeft,
       child: Text(
-        texto, 
+        texto,
         style: const TextStyle(fontSize: 11, color: Colors.grey),
+        maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),
     );

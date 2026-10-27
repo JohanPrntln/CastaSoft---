@@ -398,6 +398,20 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     }
   }
 
+  double get _anchoPantalla => MediaQuery.sizeOf(context).width;
+
+  /// Margen exterior/interior: más aprovechable en celulares (< 480 px).
+  double get _margen => _anchoPantalla < 480 ? 12 : 20;
+
+  /// Texto de opción de desplegable: hasta 2 líneas, sin ocultar el nombre.
+  Widget _textoOpcion(String texto) => Text(
+        texto,
+        maxLines: 2,
+        softWrap: true,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(fontSize: _anchoPantalla < 400 ? 13.5 : 14),
+      );
+
   String get _tituloAppBar {
     final accion = _esEdicion ? 'Editar' : 'Registrar';
     return _esHembra ? '$accion Gallina / Hembra' : '$accion Gallo / Macho';
@@ -420,6 +434,8 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white60,
           isScrollable: true,
+          tabAlignment: TabAlignment.center,
+          labelPadding: EdgeInsets.symmetric(horizontal: _anchoPantalla < 400 ? 10 : 16),
           tabs: const [
             Tab(icon: FaIcon(FontAwesomeIcons.kiwiBird), text: 'Datos'),
             Tab(icon: FaIcon(FontAwesomeIcons.sitemap), text: 'Genealogía'),
@@ -487,7 +503,8 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   Widget _buildResponsiveDualInput(Widget input1, Widget input2) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < 350) { 
+        // Apila en celulares angostos (< 420 px) o si la tarjeta es estrecha
+        if (constraints.maxWidth < 350 || _anchoPantalla < 420) {
           return Column(
             children: [
               input1,
@@ -525,7 +542,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     }
 
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(_margen),
       children: [
         const Align(
           alignment: Alignment.centerRight,
@@ -628,14 +645,18 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     final String? madreVisible = madres.any((g) => g.id == _madreId) ? _madreId : null;
 
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(_margen),
       children: [
         _buildCard('Padres en el Sistema', [
           DropdownButtonFormField<String>(
             key: ValueKey('padre-$padreVisible'),
             isExpanded: true,
             initialValue: padreVisible,
-            items: padres.map((g) => DropdownMenuItem(value: g.id, child: Text(g.etiquetaSelector, overflow: TextOverflow.ellipsis))).toList(),
+            itemHeight: null,
+            items: padres.map((g) => DropdownMenuItem(value: g.id, child: _textoOpcion(g.etiquetaSelector))).toList(),
+            selectedItemBuilder: (_) => padres
+                .map((g) => Align(alignment: Alignment.centerLeft, child: _textoOpcion(g.etiquetaSelector)))
+                .toList(),
             onChanged: (v) {
               setState(() {
                 _padreId = v;
@@ -655,7 +676,11 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
             key: ValueKey('madre-$madreVisible'),
             isExpanded: true,
             initialValue: madreVisible,
-            items: madres.map((g) => DropdownMenuItem(value: g.id, child: Text(g.etiquetaSelector, overflow: TextOverflow.ellipsis))).toList(),
+            itemHeight: null,
+            items: madres.map((g) => DropdownMenuItem(value: g.id, child: _textoOpcion(g.etiquetaSelector))).toList(),
+            selectedItemBuilder: (_) => madres
+                .map((g) => Align(alignment: Alignment.centerLeft, child: _textoOpcion(g.etiquetaSelector)))
+                .toList(),
             onChanged: (v) {
               setState(() {
                 _madreId = v;
@@ -695,7 +720,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   // PESTAÑA 3
   Widget _buildTabGestion() {
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(_margen),
       children: [
         _buildCard(_esHembra ? 'Ubicación' : 'Ubicación y Combate', [
           if (_esHembra)
@@ -731,7 +756,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   // PESTAÑA 4
   Widget _buildTabFinanzas() {
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(_margen),
       children: [
         _buildCard('Rentabilidad', [
           _buildResponsiveDualInput(
@@ -763,7 +788,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(_margen),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(title, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: const Color(0xFF1E3A8A))),
           const Divider(),
@@ -815,13 +840,16 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   }
 
   InputDecoration _inputDeco(String label, {dynamic icon, Widget? suffixIcon, String? hintText, String? helperText}) {
+    // Etiquetas, ejemplos y errores pueden ocupar varias líneas en celulares
     return InputDecoration(
-      labelText: label,
+      label: Text(label, maxLines: 2, softWrap: true, overflow: TextOverflow.ellipsis),
       hintText: hintText,
+      hintMaxLines: 3,
       helperText: helperText,
+      helperMaxLines: 2,
       helperStyle: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
-      errorMaxLines: 2,
-      labelStyle: const TextStyle(fontSize: 13),
+      errorMaxLines: 3,
+      labelStyle: TextStyle(fontSize: _anchoPantalla < 400 ? 12.5 : 13),
       prefixIcon: icon != null 
           ? IconoAdaptativo.prefijo(icon, size: 18, color: const Color(0xFF1E3A8A))
           : null,
@@ -840,7 +868,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
       initialValue: items.contains(valor) ? valor : null,
       autovalidateMode: validator != null ? AutovalidateMode.onUserInteraction : null,
       decoration: _inputDeco(label, icon: icon),
-      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 14)))).toList(),
+      items: items.map((e) => DropdownMenuItem(value: e, child: _textoOpcion(e))).toList(),
       onChanged: onChanged,
       validator: validator,
     );
@@ -898,7 +926,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
       autovalidateMode: AutovalidateMode.onUserInteraction,
       decoration: _inputDeco(label, icon: icon),
       items: opciones
-          .map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14))))
+          .map((e) => DropdownMenuItem(value: e, child: _textoOpcion(e)))
           .toList(),
       onChanged: (v) => setState(() {
         if (v == _opcionOtro) {
@@ -929,7 +957,11 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
         );
         if (elegida != null) setState(() => alCambiar(elegida));
       },
-      child: Text('📅 Fecha: ${DateFormat('dd/MM/yyyy').format(fecha)} (Cambiar)'),
+      child: Text(
+        '📅 Fecha: ${DateFormat('dd/MM/yyyy').format(fecha)} (Cambiar)',
+        textAlign: TextAlign.center,
+        softWrap: true,
+      ),
     );
   }
 
@@ -959,7 +991,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
             initialValue: _vacunaSeleccionada,
             decoration: _inputDeco('Agregar Vacuna'),
             items: [...Gallo.vacunasComunes, _opcionOtraVacuna]
-                .map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14))))
+                .map((e) => DropdownMenuItem(value: e, child: _textoOpcion(e)))
                 .toList(),
             onChanged: (v) => setState(() {
               if (v == _opcionOtraVacuna) {

@@ -273,6 +273,28 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
     );
   }
 
+  double get _anchoPantalla => MediaQuery.sizeOf(context).width;
+
+  /// Texto de opción de desplegable: hasta 2 líneas, sin ocultar el nombre.
+  Widget _textoOpcion(String texto) => Text(
+        texto,
+        maxLines: 2,
+        softWrap: true,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(fontSize: _anchoPantalla < 400 ? 13.5 : 14),
+      );
+
+  /// Dos campos en fila; en pantallas más angostas que [corte] se apilan.
+  Widget _par(Widget a, Widget b, {required double corte}) {
+    if (_anchoPantalla < corte) {
+      return Column(children: [a, const SizedBox(height: 12), b]);
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [Expanded(child: a), const SizedBox(width: 12), Expanded(child: b)],
+    );
+  }
+
   void _mostrarError(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Row(children: [const Icon(Icons.error_outline, color: Colors.white), const SizedBox(width: 10), Expanded(child: Text(mensaje))]),
@@ -292,13 +314,19 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
     // y para que DropdownButtonFormField no falle por valor inexistente.
     List<DropdownMenuItem<String>> itemsProgenitor(List<Gallo> lista, String? idActual, String? nombreGuardado) {
       final items = lista
-          .map((g) => DropdownMenuItem(value: g.id, child: Text(g.etiquetaSelector, overflow: TextOverflow.ellipsis)))
+          .map((g) => DropdownMenuItem(value: g.id, child: _textoOpcion(g.etiquetaSelector)))
           .toList();
       if (idActual != null && !lista.any((g) => g.id == idActual)) {
-        items.add(DropdownMenuItem(value: idActual, child: Text('${nombreGuardado ?? 'Desconocido'} (eliminado)')));
+        items.add(DropdownMenuItem(value: idActual, child: _textoOpcion('${nombreGuardado ?? 'Desconocido'} (eliminado)')));
       }
       return items;
     }
+
+    final itemsPadre = itemsProgenitor(padres, _padreId, widget.cruceEditar?.nombrePadre);
+    final itemsMadre = itemsProgenitor(madres, _madreId, widget.cruceEditar?.nombreMadre);
+    // El ítem seleccionado se muestra igual que en la lista (hasta 2 líneas)
+    List<Widget> seleccionados(List<DropdownMenuItem<String>> items) =>
+        items.map((i) => Align(alignment: Alignment.centerLeft, child: i.child)).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -308,7 +336,7 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
       body: _guardando 
         ? Center(child: CircularProgressIndicator(color: _colorTema))
         : SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(_anchoPantalla < 480 ? 12 : 20),
             child: Form(
               key: _formKey,
               child: Column(
@@ -328,7 +356,9 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                       decoration: _inputDeco('Padre (Padrote) *', FontAwesomeIcons.mars),
                       initialValue: _padreId,
-                      items: itemsProgenitor(padres, _padreId, widget.cruceEditar?.nombrePadre),
+                      itemHeight: null,
+                      items: itemsPadre,
+                      selectedItemBuilder: (_) => seleccionados(itemsPadre),
                       onChanged: (v) => setState(() => _padreId = v),
                       validator: (v) => (v == null || v.isEmpty) ? 'Selecciona el padre' : null,
                     ),
@@ -339,7 +369,9 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                       decoration: _inputDeco('Madre (Madrilla) *', FontAwesomeIcons.venus),
                       initialValue: _madreId,
-                      items: itemsProgenitor(madres, _madreId, widget.cruceEditar?.nombreMadre),
+                      itemHeight: null,
+                      items: itemsMadre,
+                      selectedItemBuilder: (_) => seleccionados(itemsMadre),
                       onChanged: (v) => setState(() => _madreId = v),
                       validator: (v) => (v == null || v.isEmpty) ? 'Selecciona la madre' : null,
                     ),
@@ -348,9 +380,8 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                   const SizedBox(height: 20),
 
                   _buildCard('🐣 Estadísticas de la Camada', [
-                    Row(children: [
-                      Expanded(
-                        child: TextFormField(
+                    _par(
+                      TextFormField(
                           controller: _ctrlFecha,
                           readOnly: true,
                           decoration: _inputDeco('Fecha del Cruce / Nacimiento *', FontAwesomeIcons.calendar),
@@ -364,27 +395,22 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                             }
                           },
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
+                      DropdownButtonFormField<String>(
                           key: ValueKey('luna-$_faseLunar'),
                           isExpanded: true,
                           initialValue: _faseLunar,
                           items: Gallo.opcionesFaseLunar(_faseLunar)
-                              .map((l) => DropdownMenuItem(value: l, child: Text(l, overflow: TextOverflow.ellipsis)))
+                              .map((l) => DropdownMenuItem(value: l, child: _textoOpcion(l)))
                               .toList(),
                           onChanged: (v) => setState(() => _faseLunar = v),
                           decoration: _inputDeco('Luna', FontAwesomeIcons.moon),
                         ),
-                      ),
-                    ]),
+                      corte: 420,
+                    ),
                     const SizedBox(height: 15),
                     
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
+                    _par(
+                          TextFormField(
                             key: const Key('campo-nacidos'),
                             controller: _ctrlCantidad,
                             keyboardType: TextInputType.number,
@@ -395,10 +421,7 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                             validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                             onChanged: (_) => _revalidarConteos(),
                           ),
-                        ),
-                        const SizedBox(width: 15),
-                        Expanded(
-                          child: TextFormField(
+                          TextFormField(
                             key: _claveMuertos,
                             controller: _ctrlMuertos,
                             keyboardType: TextInputType.number,
@@ -406,12 +429,11 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                             maxLength: 3,
                             style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
                             autovalidateMode: AutovalidateMode.onUserInteraction,
-                            decoration: _inputDeco('Bajas / Muertos *', FontAwesomeIcons.skull).copyWith(errorMaxLines: 3),
+                            decoration: _inputDeco('Bajas / Muertos *', FontAwesomeIcons.skull),
                             validator: _validarMuertos,
                             onChanged: (_) => _revalidarConteos(),
                           ),
-                        ),
-                      ],
+                          corte: 360,
                     ),
                     
                     const SizedBox(height: 15),
@@ -422,10 +444,8 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                     _buildResumenCamada(),
                     const SizedBox(height: 10),
 
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
+                    _par(
+                          TextFormField(
                             key: _claveMachos,
                             controller: _ctrlMachos,
                             keyboardType: TextInputType.number,
@@ -433,14 +453,11 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                             maxLength: 3,
                             style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold),
                             autovalidateMode: AutovalidateMode.onUserInteraction,
-                            decoration: _inputDeco('Machos', FontAwesomeIcons.mars).copyWith(errorMaxLines: 3),
+                            decoration: _inputDeco('Machos', FontAwesomeIcons.mars),
                             validator: _validarSexado,
                             onChanged: (_) => _revalidarConteos(),
                           ),
-                        ),
-                        const SizedBox(width: 15),
-                        Expanded(
-                          child: TextFormField(
+                          TextFormField(
                             key: _claveHembras,
                             controller: _ctrlHembras,
                             keyboardType: TextInputType.number,
@@ -448,12 +465,11 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                             maxLength: 3,
                             style: TextStyle(color: Colors.pink.shade700, fontWeight: FontWeight.bold),
                             autovalidateMode: AutovalidateMode.onUserInteraction,
-                            decoration: _inputDeco('Hembras', FontAwesomeIcons.venus).copyWith(errorMaxLines: 3),
+                            decoration: _inputDeco('Hembras', FontAwesomeIcons.venus),
                             validator: _validarSexado,
                             onChanged: (_) => _revalidarConteos(),
                           ),
-                        ),
-                      ],
+                          corte: 360,
                     ),
                   ]),
 
@@ -464,7 +480,7 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                         key: ValueKey('marca-$_pataMarca'),
                         initialValue: _pataMarca,
                         isExpanded: true, // Para que los textos largos no se corten
-                        items: _opcionesIdentificacion.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
+                        items: _opcionesIdentificacion.map((l) => DropdownMenuItem(value: l, child: _textoOpcion(l))).toList(),
                         onChanged: (v) => setState(() => _pataMarca = v!),
                         decoration: _inputDeco('Ubicación de la marca en los pollitos', FontAwesomeIcons.locationDot),
                       ),
@@ -482,7 +498,6 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                           FontAwesomeIcons.tag,
                         ).copyWith(
                           hintText: 'Ej: Cintillo verde, Placas #201 a #205, Marca en ala...',
-                          errorMaxLines: 2,
                         ),
                       ),
                   ]),
@@ -586,7 +601,7 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(_anchoPantalla < 480 ? 12 : 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -600,9 +615,13 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
   }
 
   InputDecoration _inputDeco(String label, dynamic icon) {
+    // Etiquetas, ejemplos y errores pueden ocupar varias líneas en celulares
     return InputDecoration(
-      labelText: label,
-      labelStyle: const TextStyle(fontSize: 13),
+      label: Text(label, maxLines: 2, softWrap: true, overflow: TextOverflow.ellipsis),
+      labelStyle: TextStyle(fontSize: _anchoPantalla < 400 ? 12.5 : 13),
+      hintMaxLines: 3,
+      errorMaxLines: 3,
+      helperMaxLines: 2,
       prefixIcon: icon != null 
           ? IconoAdaptativo.prefijo(icon, size: 18, color: const Color(0xFF1E3A8A))
           : null,

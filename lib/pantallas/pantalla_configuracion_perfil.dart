@@ -214,7 +214,10 @@ class _PantallaConfiguracionPerfilState extends State<PantallaConfiguracionPerfi
       inputFormatters: isNumber ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9+\s\-]'))] : null,
       maxLength: isNumber ? 20 : null,
       decoration: InputDecoration(
-        labelText: label,
+        label: Text(label, maxLines: 2, softWrap: true),
+        hintMaxLines: 2,
+        errorMaxLines: 3,
+        helperMaxLines: 2,
         prefixIcon: IconoAdaptativo.prefijo(icon, color: const Color(0xFF1E3A8A), size: 18),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,

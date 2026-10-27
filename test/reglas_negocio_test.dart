@@ -492,10 +492,11 @@ void main() {
     test('nombreMostrar y etiquetaSelector nunca quedan en blanco', () {
       final sinNombre = galloCompleto(nombre: '   ', placa: 'P1');
       expect(sinNombre.nombreMostrar, 'Sin apodo (#P1)');
-      expect(sinNombre.etiquetaSelector, '[Placa #P1] - Sin apodo (Kelso)');
-      expect(galloCompleto(placa: 'A7').etiquetaSelector, '[Placa #A7] - Centella (Kelso)');
-      expect(galloCompleto(placa: 'A7', linea: '').etiquetaSelector, '[Placa #A7] - Centella');
-      expect(galloCompleto(nombre: '', placa: '', linea: '').etiquetaSelector, 'Sin placa - Sin apodo');
+      expect(sinNombre.etiquetaSelector, 'Sin apodo (#P1) • Kelso');
+      expect(galloCompleto(placa: 'A7', nombre: 'Rayo').etiquetaSelector, 'Rayo (#A7) • Kelso');
+      expect(galloCompleto(placa: 'A7', linea: '').etiquetaSelector, 'Centella (#A7)');
+      expect(galloCompleto(nombre: '', placa: 'P1', linea: '').etiquetaSelector, 'Sin apodo (#P1)');
+      expect(galloCompleto(nombre: '', placa: '', linea: '').etiquetaSelector, 'Sin apodo (Sin placa)');
       expect(galloCompleto(nombre: '', placa: '').nombreMostrar, 'Sin apodo');
     });
 
@@ -601,16 +602,16 @@ void main() {
       ]);
       await tester.tap(find.text('Padre (Padrote) *'));
       await tester.pumpAndSettle();
-      expect(find.text('[Placa #P1] - Sin apodo (Kelso)'), findsWidgets);
-      expect(find.text('[Placa #P2] - Rayo (Hatch)'), findsWidgets);
+      expect(find.text('Sin apodo (#P1) • Kelso'), findsWidgets);
+      expect(find.text('Rayo (#P2) • Hatch'), findsWidgets);
       final textos = tester.widgetList<Text>(find.byType(Text)).map((t) => t.data?.trim());
       expect(textos.where((t) => t != null && t.isEmpty), isEmpty);
-      await tester.tap(find.text('[Placa #P1] - Sin apodo (Kelso)').last);
+      await tester.tap(find.text('Sin apodo (#P1) • Kelso').last);
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Madre (Madrilla) *'));
       await tester.pumpAndSettle();
-      expect(find.text('[Placa #M1] - Sin apodo (Sweater)'), findsWidgets);
+      expect(find.text('Sin apodo (#M1) • Sweater'), findsWidgets);
     });
 
     testWidgets('error inmediato si hay más muertos que nacidos', (tester) async {
@@ -699,6 +700,144 @@ void main() {
             padreId: 'p', madreId: 'm', cantidadHuevos: 4, pollitosMuertos: 1, pollitosMachos: 2, pollitosHembras: 2),
         'La suma de machos y hembras (4) supera los pollitos vivos actuales (3)',
       );
+    });
+  });
+
+  group('Responsive móvil (360x640)', () {
+    final progenitores = [
+      galloCompleto(id: 'p-rayo', placa: 'A7', nombre: 'Rayo'),
+      galloCompleto(id: 'p-sin', placa: 'P1', nombre: ''),
+      galloCompleto(id: 'm-perla', placa: 'H3', nombre: 'Perla', sexo: 'Hembra', linea: 'Hatch'),
+    ];
+
+    Future<void> pantallaMovil(WidgetTester tester, Widget pantalla, {Size tamano = const Size(360, 640)}) async {
+      tester.view.physicalSize = tamano;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(ChangeNotifierProvider<GallosProveedor>(
+        create: (_) => GallosProveedor.enMemoria(progenitores),
+        child: MaterialApp(home: pantalla),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    void expectDecoracionesMultilinea(WidgetTester tester) {
+      final decoradores = tester.widgetList<InputDecorator>(find.byType(InputDecorator));
+      expect(decoradores, isNotEmpty);
+      for (final d in decoradores) {
+        expect(d.decoration.hintMaxLines, greaterThanOrEqualTo(2));
+        expect(d.decoration.errorMaxLines, greaterThanOrEqualTo(2));
+      }
+    }
+
+    testWidgets('PantallaFormularioGallo: 4 pestañas sin overflow y textos multilínea', (tester) async {
+      await pantallaMovil(tester, const PantallaFormularioGallo());
+      expect(tester.takeException(), isNull);
+      for (final tab in ['Datos', 'Genealogía', 'Gestión', 'Finanzas']) {
+        expect(find.text(tab), findsOneWidget);
+      }
+      expectDecoracionesMultilinea(tester);
+
+      // Línea Genética y Color Pluma se apilan a ancho completo en < 420 px
+      await tester.dragUntilVisible(find.text('Color Pluma *'), find.byType(ListView), const Offset(0, -200));
+      await tester.pumpAndSettle();
+      final linea = tester.getTopLeft(find.text('Línea Genética *'));
+      final color = tester.getTopLeft(find.text('Color Pluma *'));
+      expect(color.dy, greaterThan(linea.dy));
+
+      for (final tab in ['Genealogía', 'Gestión', 'Finanzas']) {
+        await tester.tap(find.text(tab));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: tab);
+        expectDecoracionesMultilinea(tester);
+      }
+    });
+
+    testWidgets('PantallaFormularioGallo: Genealogía muestra el nombre primero', (tester) async {
+      await pantallaMovil(tester, const PantallaFormularioGallo());
+      await tester.tap(find.text('Genealogía'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Padre (Macho)'));
+      await tester.pumpAndSettle();
+      expect(find.text('Rayo (#A7) • Kelso'), findsWidgets);
+      expect(find.text('Sin apodo (#P1) • Kelso'), findsWidgets);
+      await tester.tap(find.text('Rayo (#A7) • Kelso').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Rayo (#A7) • Kelso'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('PantallaFormularioCruce: sin overflow, nombre primero y errores largos legibles', (tester) async {
+      await pantallaMovil(tester, const PantallaFormularioCruce());
+      expect(tester.takeException(), isNull);
+      expectDecoracionesMultilinea(tester);
+
+      await tester.tap(find.text('Padre (Padrote) *'));
+      await tester.pumpAndSettle();
+      expect(find.text('Rayo (#A7) • Kelso'), findsWidgets);
+      expect(find.text('Sin apodo (#P1) • Kelso'), findsWidgets);
+      await tester.tap(find.text('Sin apodo (#P1) • Kelso').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Sin apodo (#P1) • Kelso'), findsOneWidget);
+
+      await tester.tap(find.text('Madre (Madrilla) *'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Perla (#H3) • Hatch').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Perla (#H3) • Hatch'), findsOneWidget);
+
+      await tester.enterText(find.byKey(const Key('campo-nacidos')), '4');
+      await tester.pump();
+      await tester.enterText(find.widgetWithText(TextFormField, 'Bajas / Muertos *'), '5');
+      await tester.pump();
+      expect(find.text('No puedes registrar más bajas (5) que los pollitos nacidos (4)'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      // Fecha y Luna se apilan en < 420 px
+      final fecha = tester.getTopLeft(find.text('Fecha del Cruce / Nacimiento *'));
+      final luna = tester.getTopLeft(find.text('Luna'));
+      expect(luna.dy, greaterThan(fecha.dy));
+    });
+
+    testWidgets('PantallaFormularioCruce en 320 px apila los pares numéricos', (tester) async {
+      await pantallaMovil(tester, const PantallaFormularioCruce(), tamano: const Size(320, 640));
+      expect(tester.takeException(), isNull);
+      final nacidos = tester.getTopLeft(find.text('Pollitos Nacidos *'));
+      final muertos = tester.getTopLeft(find.text('Bajas / Muertos *'));
+      expect(muertos.dy, greaterThan(nacidos.dy));
+      final machos = tester.getTopLeft(find.text('Machos'));
+      final hembras = tester.getTopLeft(find.text('Hembras'));
+      expect(hembras.dy, greaterThan(machos.dy));
+    });
+
+    testWidgets('Gestión en 320 px: botones de fecha sin overflow', (tester) async {
+      await pantallaMovil(tester, const PantallaFormularioGallo(), tamano: const Size(320, 640));
+      await tester.tap(find.text('Gestión'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('(Cambiar)'), findsOneWidget);
+      // El de peleas está más abajo en la lista
+      await tester.dragUntilVisible(find.text('Historial de Peleas'), find.byType(ListView), const Offset(0, -200));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('(Cambiar)'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('TarjetaGallo en 320 px: nombre largo en 2 líneas sin overflow', (tester) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: TarjetaGallo(
+            gallo: galloCompleto(nombre: 'Relámpago Dorado del Valle Alto', placa: 'ARGOLLA AZUL 2024-77'),
+            onTap: () {},
+          ),
+        ),
+      ));
+      expect(tester.takeException(), isNull);
+      final nombre = tester.widget<Text>(find.text('Relámpago Dorado del Valle Alto'));
+      expect(nombre.maxLines, 2);
     });
   });
 }

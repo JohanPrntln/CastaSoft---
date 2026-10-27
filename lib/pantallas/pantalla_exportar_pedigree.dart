@@ -465,7 +465,10 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
         inputFormatters: isNumber ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9+\s\-]'))] : null,
         maxLength: isNumber ? 20 : null,
         decoration: InputDecoration(
-          labelText: label, 
+          label: Text(label, maxLines: 2, softWrap: true),
+          hintMaxLines: 2,
+          errorMaxLines: 3,
+          helperMaxLines: 2,
           prefixIcon: icon != null 
               ? IconoAdaptativo.prefijo(icon, size: 20, color: Colors.grey.shade600)
               : null, 

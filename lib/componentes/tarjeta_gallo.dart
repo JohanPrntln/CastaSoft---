@@ -150,7 +150,7 @@ class TarjetaGallo extends StatelessWidget {
                                 fontWeight: FontWeight.w700,
                                 color: const Color(0xFF0F172A),
                               ),
-                              maxLines: 1,
+                              maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -205,7 +205,7 @@ class TarjetaGallo extends StatelessWidget {
                                   fontWeight: FontWeight.w600,
                                   color: const Color(0xFFD4AF37),
                                 ),
-                                maxLines: 1,
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -231,8 +231,14 @@ class TarjetaGallo extends StatelessWidget {
                       const SizedBox(height: 8),
 
                       // Botones de acción (Ver ficha / Editar / Borrar) alineados a la derecha
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+                      // Wrap: en celulares angostos los botones bajan de línea en vez de desbordar
+                      SizedBox(
+                        width: double.infinity,
+                        child: Wrap(
+                        alignment: WrapAlignment.end,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 12,
+                        runSpacing: 8,
                         children: [
                             InkWell(
                               key: const Key('boton-ver-ficha'),
@@ -261,7 +267,6 @@ class TarjetaGallo extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
                             InkWell(
                               onTap: onEdit,
                               child: Container(
@@ -270,7 +275,6 @@ class TarjetaGallo extends StatelessWidget {
                                 child: FaIcon(FontAwesomeIcons.pencil, size: 14, color: Colors.blue.shade800),
                               ),
                             ),
-                            const SizedBox(width: 12),
                             InkWell(
                               onTap: onDelete,
                               child: Container(
@@ -280,6 +284,7 @@ class TarjetaGallo extends StatelessWidget {
                               ),
                             ),
                         ],
+                      ),
                       ),
                     ],
                   ),

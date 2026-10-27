@@ -184,15 +184,15 @@ class Gallo {
     return placa.trim().isEmpty ? 'Sin apodo' : 'Sin apodo (#${placa.trim()})';
   }
 
-  /// Etiqueta inequívoca para selectores de Padre/Madre:
-  /// "[Placa #A1] - Rayo (Kelso)" o "[Placa #A1] - Sin apodo (Kelso)".
+  /// Etiqueta para selectores de Padre/Madre con el nombre primero:
+  /// "Rayo (#A7) • Kelso", "Sin apodo (#P1) • Kelso" o "Sin apodo (Sin placa)".
   String get etiquetaSelector {
     final p = placa.trim();
     final n = nombre.trim();
     final l = lineaGenetica.trim();
-    final textoPlaca = p.isEmpty ? 'Sin placa' : '[Placa #$p]';
     final textoNombre = n.isEmpty ? 'Sin apodo' : n;
-    return '$textoPlaca - $textoNombre${l.isEmpty ? '' : ' ($l)'}';
+    final textoPlaca = p.isEmpty ? '(Sin placa)' : '(#$p)';
+    return '$textoNombre $textoPlaca${l.isEmpty ? '' : ' • $l'}';
   }
 
   // ==================== 1. IDENTIFICACIÓN ====================
