@@ -12,6 +12,7 @@ import 'package:castasoft/componentes/tarjeta_gallo.dart';
 import 'package:castasoft/modelos/cruce_modelo.dart';
 import 'package:castasoft/modelos/foto_base64.dart';
 import 'package:castasoft/modelos/gallo_modelo.dart';
+import 'package:castasoft/pantallas/pantalla_formulario_cruce.dart';
 import 'package:castasoft/pantallas/pantalla_formulario_gallo.dart';
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
 
@@ -22,10 +23,13 @@ Gallo galloCompleto({
   String? nombrePadre,
   String? jaula,
   double? costo,
+  String nombre = 'Centella',
+  String sexo = 'Macho',
+  String linea = 'Kelso',
 }) =>
     Gallo(
-      id: id, placa: placa, nombre: 'Centella', sexo: 'Macho', fechaNacimiento: DateTime(2024),
-      lineaGenetica: 'Kelso', colorPluma: 'Giro', faseLunar: 'Luna llena', estado: 'Activo', etapaVida: 'Padrote',
+      id: id, placa: placa, nombre: nombre, sexo: sexo, fechaNacimiento: DateTime(2024),
+      lineaGenetica: linea, colorPluma: 'Giro', faseLunar: 'Luna llena', estado: 'Activo', etapaVida: 'Padrote',
       pesoActual: 5.0, videoUrl: videoUrl, nombrePadre: nombrePadre, jaula: jaula, costoAdquisicion: costo,
     );
 
@@ -331,7 +335,7 @@ void main() {
       await tester.enterText(peso, '12.5');
       expect(tester.widget<TextFormField>(peso).controller!.text, '12.5');
 
-      await elegir(tester, 'Color Pluma', '➕ Otro (Escribir manualmente...)');
+      await elegir(tester, 'Color Pluma *', '➕ Otro (Escribir manualmente...)');
       final color = find.byKey(const Key('color-manual'));
       expect(color, findsOneWidget);
       await tester.enterText(color, 'Giro123');
@@ -353,7 +357,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Línea Genética'));
+      await tester.tap(find.text('Línea Genética *'));
       await tester.pumpAndSettle();
       for (final l in ['Kelso', 'Hatch', 'Sweater', 'Albany', 'Claret', '➕ Otro (Escribir manualmente...)']) {
         expect(find.text(l), findsWidgets);
@@ -363,7 +367,7 @@ void main() {
       await tester.tap(find.text('Kelso').last);
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Color Pluma'));
+      await tester.tap(find.text('Color Pluma *'));
       await tester.pumpAndSettle();
       expect(find.text('Cenizo'), findsWidgets);
       expect(find.text('Color Raro'), findsNothing);
@@ -380,7 +384,7 @@ void main() {
 
     testWidgets('Línea Genética manual bloquea comillas y símbolos raros', (tester) async {
       await abrirFormulario(tester);
-      await elegir(tester, 'Línea Genética', '➕ Otro (Escribir manualmente...)');
+      await elegir(tester, 'Línea Genética *', '➕ Otro (Escribir manualmente...)');
       final linea = find.byKey(const Key('linea-manual'));
       await tester.enterText(linea, 'F1 "Hatch"! 50%');
       expect(tester.widget<TextFormField>(linea).controller!.text, 'F1 Hatch 50%');
@@ -482,5 +486,219 @@ void main() {
     expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
     await tester.tap(find.byKey(const Key('boton-ver-ficha')));
     expect(abierto, isTrue);
+  });
+
+  group('Ejemplares sin nombre (datos históricos)', () {
+    test('nombreMostrar y etiquetaSelector nunca quedan en blanco', () {
+      final sinNombre = galloCompleto(nombre: '   ', placa: 'P1');
+      expect(sinNombre.nombreMostrar, 'Sin apodo (#P1)');
+      expect(sinNombre.etiquetaSelector, '[Placa #P1] - Sin apodo (Kelso)');
+      expect(galloCompleto(placa: 'A7').etiquetaSelector, '[Placa #A7] - Centella (Kelso)');
+      expect(galloCompleto(placa: 'A7', linea: '').etiquetaSelector, '[Placa #A7] - Centella');
+      expect(galloCompleto(nombre: '', placa: '', linea: '').etiquetaSelector, 'Sin placa - Sin apodo');
+      expect(galloCompleto(nombre: '', placa: '').nombreMostrar, 'Sin apodo');
+    });
+
+    testWidgets('TarjetaGallo muestra "Sin apodo (#placa)" si el nombre está vacío', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: TarjetaGallo(gallo: galloCompleto(nombre: '', placa: 'P1'), onTap: () {})),
+      ));
+      expect(find.text('Sin apodo (#P1)'), findsOneWidget);
+    });
+  });
+
+  group('PantallaFormularioGallo: placa en tiempo real y obligatorios', () {
+    Future<void> abrir(WidgetTester tester, List<Gallo> gallos, {Gallo? editar}) async {
+      tester.view.physicalSize = const Size(1200, 3200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(ChangeNotifierProvider<GallosProveedor>(
+        create: (_) => GallosProveedor.enMemoria(gallos),
+        child: MaterialApp(home: PantallaFormularioGallo(galloEditar: editar)),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    const duplicada = 'Esta placa ya está registrada en otro ejemplar de este criadero';
+
+    testWidgets('detecta placa duplicada al escribir (sin distinguir mayúsculas/espacios)', (tester) async {
+      await abrir(tester, [galloCompleto(id: 'g-a', placa: 'A-100')]);
+      final placa = find.byKey(const Key('campo-placa'));
+      await tester.enterText(placa, '  a-100 ');
+      await tester.pump();
+      expect(find.text(duplicada), findsOneWidget);
+      expect(find.text('✓ Placa disponible'), findsNothing);
+
+      await tester.enterText(placa, 'A-101');
+      await tester.pump();
+      expect(find.text(duplicada), findsNothing);
+      expect(find.text('✓ Placa disponible'), findsOneWidget);
+    });
+
+    testWidgets('en edición conserva su propia placa sin marcarse como duplicada', (tester) async {
+      final propio = galloCompleto(id: 'g-a', placa: 'A-100');
+      await abrir(tester, [propio, galloCompleto(id: 'g-b', placa: 'B-200')], editar: propio);
+      final placa = find.byKey(const Key('campo-placa'));
+      await tester.enterText(placa, 'A-100');
+      await tester.pump();
+      expect(find.text(duplicada), findsNothing);
+      expect(find.text('✓ Placa disponible'), findsOneWidget);
+
+      await tester.enterText(placa, 'b-200');
+      await tester.pump();
+      expect(find.text(duplicada), findsOneWidget);
+    });
+
+    testWidgets('marca los obligatorios con * y muestra la nota', (tester) async {
+      await abrir(tester, []);
+      expect(find.text('* Campos obligatorios'), findsOneWidget);
+      for (final label in [
+        'Placa / Anillo *', 'Nombre *', 'Sexo *', 'Fecha de Nacimiento *',
+        'Línea Genética *', 'Color Pluma *', 'Peso Actual (Lbs) *',
+      ]) {
+        expect(find.text(label), findsOneWidget, reason: label);
+      }
+    });
+
+    testWidgets('nombre vacío muestra "Requerido" en tiempo real', (tester) async {
+      await abrir(tester, []);
+      final nombre = find.widgetWithText(TextFormField, 'Nombre *');
+      await tester.enterText(nombre, 'Rayo');
+      await tester.pump();
+      await tester.enterText(nombre, '   ');
+      await tester.pump();
+      expect(find.text('Requerido'), findsOneWidget);
+    });
+  });
+
+  group('PantallaFormularioCruce', () {
+    Future<void> abrirCruce(WidgetTester tester, List<Gallo> gallos) async {
+      tester.view.physicalSize = const Size(1200, 3200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(ChangeNotifierProvider<GallosProveedor>(
+        create: (_) => GallosProveedor.enMemoria(gallos),
+        child: const MaterialApp(home: PantallaFormularioCruce()),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> escribir(WidgetTester tester, Finder campo, String texto) async {
+      await tester.enterText(campo, texto);
+      await tester.pump();
+    }
+
+    final nacidos = find.byKey(const Key('campo-nacidos'));
+    final muertos = find.widgetWithText(TextFormField, 'Bajas / Muertos *');
+    final machos = find.widgetWithText(TextFormField, 'Machos');
+    final hembras = find.widgetWithText(TextFormField, 'Hembras');
+
+    testWidgets('selectores de Padre/Madre muestran placa y "Sin apodo", nunca en blanco', (tester) async {
+      await abrirCruce(tester, [
+        galloCompleto(id: 'p1', placa: 'P1', nombre: ''),
+        galloCompleto(id: 'p2', placa: 'P2', nombre: 'Rayo', linea: 'Hatch'),
+        galloCompleto(id: 'm1', placa: 'M1', nombre: ' ', sexo: 'Hembra', linea: 'Sweater'),
+      ]);
+      await tester.tap(find.text('Padre (Padrote) *'));
+      await tester.pumpAndSettle();
+      expect(find.text('[Placa #P1] - Sin apodo (Kelso)'), findsWidgets);
+      expect(find.text('[Placa #P2] - Rayo (Hatch)'), findsWidgets);
+      final textos = tester.widgetList<Text>(find.byType(Text)).map((t) => t.data?.trim());
+      expect(textos.where((t) => t != null && t.isEmpty), isEmpty);
+      await tester.tap(find.text('[Placa #P1] - Sin apodo (Kelso)').last);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Madre (Madrilla) *'));
+      await tester.pumpAndSettle();
+      expect(find.text('[Placa #M1] - Sin apodo (Sweater)'), findsWidgets);
+    });
+
+    testWidgets('error inmediato si hay más muertos que nacidos', (tester) async {
+      await abrirCruce(tester, []);
+      await escribir(tester, nacidos, '4');
+      await escribir(tester, muertos, '5');
+      expect(find.text('No puedes registrar más bajas (5) que los pollitos nacidos (4)'), findsOneWidget);
+      expect(find.byKey(const Key('chip-vivos')), findsNothing);
+      // Al corregir los nacidos, el error desaparece en tiempo real
+      await escribir(tester, nacidos, '10');
+      expect(find.textContaining('No puedes registrar más bajas'), findsNothing);
+      expect(find.text('Pollitos vivos actuales: 5'), findsOneWidget);
+    });
+
+    testWidgets('error inmediato si machos + hembras superan a los vivos', (tester) async {
+      await abrirCruce(tester, []);
+      await escribir(tester, nacidos, '4');
+      await escribir(tester, muertos, '1');
+      await escribir(tester, machos, '2');
+      await escribir(tester, hembras, '2');
+      expect(find.text('La suma de machos y hembras (4) supera los pollitos vivos actuales (3)'), findsNWidgets(2));
+      expect(find.byKey(const Key('chip-pendientes')), findsNothing);
+      await escribir(tester, hembras, '1');
+      expect(find.textContaining('La suma de machos y hembras'), findsNothing);
+      expect(find.text('Pendientes por definir sexo: 0'), findsOneWidget);
+    });
+
+    testWidgets('0 machos y 0 hembras es válido (sexado diferido) y el resumen se calcula', (tester) async {
+      await abrirCruce(tester, []);
+      await escribir(tester, nacidos, '8');
+      await escribir(tester, muertos, '2');
+      await escribir(tester, machos, '0');
+      await escribir(tester, hembras, '0');
+      expect(find.textContaining('La suma de machos y hembras'), findsNothing);
+      expect(find.text('Pollitos vivos actuales: 6'), findsOneWidget);
+      expect(find.text('Pendientes por definir sexo: 6'), findsOneWidget);
+      await escribir(tester, machos, '2');
+      expect(find.text('Pendientes por definir sexo: 4'), findsOneWidget);
+      expect(find.text('Clasificación por Sexo'), findsOneWidget);
+      expect(find.textContaining('Sexado'), findsNothing);
+    });
+
+    testWidgets('obligatorios con * y etiquetas claras del marcaje de la camada', (tester) async {
+      await abrirCruce(tester, []);
+      expect(find.text('* Campos obligatorios'), findsOneWidget);
+      for (final label in [
+        'Padre (Padrote) *', 'Madre (Madrilla) *', 'Fecha del Cruce / Nacimiento *', 'Pollitos Nacidos *',
+        'Marcaje e Identificación de la Camada (Pollitos)', 'Ubicación de la marca en los pollitos',
+        'Detalle de placa, color de cintillo, marca del lote o placa/anillo',
+      ]) {
+        expect(find.text(label), findsOneWidget, reason: label);
+      }
+      final detalle = find.byKey(const Key('campo-detalle-marca'));
+      final campo = tester.widget<TextField>(find.descendant(of: detalle, matching: find.byType(TextField)));
+      expect(campo.maxLength, 80);
+      expect(campo.decoration!.hintText, 'Ej: Cintillo verde, Placas #201 a #205, Marca en ala...');
+
+      await escribir(tester, detalle, 'A' * 95);
+      expect(tester.widget<TextFormField>(detalle).controller!.text.length, 80);
+      await escribir(tester, detalle, 'Cintillo verde, Placas #201 a #205');
+      expect(find.text(CruceModelo.mensajeDetalleMarcaInvalido), findsNothing);
+      await escribir(tester, detalle, '#-');
+      expect(find.text(CruceModelo.mensajeDetalleMarcaInvalido), findsOneWidget);
+    });
+  });
+
+  group('CruceModelo.validarDetalleMarca', () {
+    test('opcional, 3-80 caracteres y sin cadenas de solo símbolos', () {
+      expect(CruceModelo.validarDetalleMarca(''), isNull);
+      expect(CruceModelo.validarDetalleMarca('  '), isNull);
+      expect(CruceModelo.validarDetalleMarca('Cintillo verde, Placas #201 a #205'), isNull);
+      expect(CruceModelo.validarDetalleMarca('Ala-D.'), isNull);
+      expect(CruceModelo.validarDetalleMarca('ab'), isNotNull);
+      expect(CruceModelo.validarDetalleMarca('#-,.'), isNotNull);
+      expect(CruceModelo.validarDetalleMarca('Marca "roja"!'), isNotNull);
+      expect(CruceModelo.validarDetalleMarca('a' * 81), isNotNull);
+    });
+    test('mensajes humanos de RN-02', () {
+      expect(
+        CruceModelo.validarReglasNegocio(
+            padreId: 'p', madreId: 'm', cantidadHuevos: 4, pollitosMuertos: 5, pollitosMachos: 0, pollitosHembras: 0),
+        'No puedes registrar más bajas (5) que los pollitos nacidos (4)',
+      );
+      expect(
+        CruceModelo.validarReglasNegocio(
+            padreId: 'p', madreId: 'm', cantidadHuevos: 4, pollitosMuertos: 1, pollitosMachos: 2, pollitosHembras: 2),
+        'La suma de machos y hembras (4) supera los pollitos vivos actuales (3)',
+      );
+    });
   });
 }

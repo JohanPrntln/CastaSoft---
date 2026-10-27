@@ -658,7 +658,7 @@ class _PantallaInicioState extends State<PantallaInicio> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmar Eliminación'),
-        content: Text('¿Está seguro que desea eliminar a ${gallo.nombre}?'),
+        content: Text('¿Está seguro que desea eliminar a ${gallo.nombreMostrar}?'),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
           TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Eliminar', style: TextStyle(color: Colors.red))),

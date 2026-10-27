@@ -208,7 +208,7 @@ class GallosProveedor extends ChangeNotifier {
   String resolverNombrePariente(String? nombreGuardado, String? idPariente) {
     if (nombreGuardado != null && nombreGuardado.isNotEmpty) return nombreGuardado;
     if (idPariente == null) return 'Desconocido';
-    return _indicePorId[idPariente]?.nombre ?? 'Desconocido';
+    return _indicePorId[idPariente]?.nombreMostrar ?? 'Desconocido';
   }
 
   /// RN-01 en memoria: `_gallos` es el espejo en tiempo real de Firestore

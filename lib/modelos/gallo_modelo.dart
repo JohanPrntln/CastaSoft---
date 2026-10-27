@@ -178,6 +178,23 @@ class Gallo {
   static String eventoConFecha(String evento, DateTime fecha) =>
       '${quitarFechas(evento)} (${DateFormat('dd/MM/yyyy').format(fecha)})';
 
+  /// Nombre a mostrar en tarjetas y listados; nunca vacío (datos antiguos sin apodo).
+  String get nombreMostrar {
+    if (nombre.trim().isNotEmpty) return nombre.trim();
+    return placa.trim().isEmpty ? 'Sin apodo' : 'Sin apodo (#${placa.trim()})';
+  }
+
+  /// Etiqueta inequívoca para selectores de Padre/Madre:
+  /// "[Placa #A1] - Rayo (Kelso)" o "[Placa #A1] - Sin apodo (Kelso)".
+  String get etiquetaSelector {
+    final p = placa.trim();
+    final n = nombre.trim();
+    final l = lineaGenetica.trim();
+    final textoPlaca = p.isEmpty ? 'Sin placa' : '[Placa #$p]';
+    final textoNombre = n.isEmpty ? 'Sin apodo' : n;
+    return '$textoPlaca - $textoNombre${l.isEmpty ? '' : ' ($l)'}';
+  }
+
   // ==================== 1. IDENTIFICACIÓN ====================
   final String id;
   final String? userId; // Dueño del gallo (Seguridad Nube)

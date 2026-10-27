@@ -144,7 +144,7 @@ class TarjetaGallo extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              gallo.nombre,
+                              gallo.nombreMostrar,
                               style: GoogleFonts.poppins(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,

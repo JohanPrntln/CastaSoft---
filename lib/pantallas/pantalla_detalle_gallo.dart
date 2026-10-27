@@ -99,7 +99,7 @@ class PantallaDetalleGallo extends StatelessWidget {
       appBar: AppBar(
         title: FittedBox(
           fit: BoxFit.scaleDown,
-          child: Text(gallo.nombre, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white))
+          child: Text(gallo.nombreMostrar, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white))
         ),
         backgroundColor: const Color(0xFF1E3A8A),
         iconTheme: const IconThemeData(color: Colors.white),
@@ -208,7 +208,7 @@ class PantallaDetalleGallo extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
-              gallo.nombre, 
+              gallo.nombreMostrar,
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
               maxLines: 2,

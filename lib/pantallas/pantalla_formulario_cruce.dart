@@ -27,6 +27,10 @@ class PantallaFormularioCruce extends StatefulWidget {
 
 class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
   final _formKey = GlobalKey<FormState>();
+  // Campos que dependen entre sí: se revalidan juntos en tiempo real (RN-02)
+  final _claveMuertos = GlobalKey<FormFieldState<String>>();
+  final _claveMachos = GlobalKey<FormFieldState<String>>();
+  final _claveHembras = GlobalKey<FormFieldState<String>>();
   final Color _colorTema = const Color(0xFF059669);
 
   // Controladores
@@ -161,9 +165,9 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
 
     try {
       // RN-03: nombres desnormalizados (se conservan aunque se borre el ancestro)
-      final String nombreP = gallosProv.obtenerGalloPorId(_padreId!)?.nombre
+      final String nombreP = gallosProv.obtenerGalloPorId(_padreId!)?.nombreMostrar
           ?? (_esEdicion ? widget.cruceEditar!.nombrePadre : 'Desconocido');
-      final String nombreM = gallosProv.obtenerGalloPorId(_madreId!)?.nombre
+      final String nombreM = gallosProv.obtenerGalloPorId(_madreId!)?.nombreMostrar
           ?? (_esEdicion ? widget.cruceEditar!.nombreMadre : 'Desconocida');
 
       final user = FirebaseAuth.instance.currentUser;
@@ -216,6 +220,59 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
     }
   }
 
+  static int _entero(TextEditingController c) => int.tryParse(c.text.trim()) ?? 0;
+
+  int get _nacidos => _entero(_ctrlCantidad);
+  int get _muertos => _entero(_ctrlMuertos);
+  int get _vivos => (_nacidos - _muertos).clamp(0, 999);
+  int get _sexados => _entero(_ctrlMachos) + _entero(_ctrlHembras);
+
+  void _revalidarConteos() {
+    setState(() {});
+    for (final clave in [_claveMuertos, _claveMachos, _claveHembras]) {
+      clave.currentState?.validate();
+    }
+  }
+
+  String? _validarMuertos(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Requerido';
+    if (_muertos > _nacidos) return CruceModelo.mensajeMuertosExcedidos(_muertos, _nacidos);
+    return null;
+  }
+
+  // Sexado diferido: 0 machos y 0 hembras (o una suma menor a los vivos) es válido
+  String? _validarSexado(String? _) =>
+      _sexados > _vivos ? CruceModelo.mensajeSexadoExcedido(_sexados, _vivos) : null;
+
+  String? _validarDetalleMarca(String? v) {
+    // Retrocompatibilidad: un detalle antiguo sin cambios no bloquea la edición
+    if (_esEdicion && (v ?? '').trim() == widget.cruceEditar!.detalleMarca.trim()) return null;
+    return CruceModelo.validarDetalleMarca(v);
+  }
+
+  Widget _buildResumenCamada() {
+    final muertosValidos = _muertos <= _nacidos;
+    final sexadoValido = muertosValidos && _sexados <= _vivos;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        if (muertosValidos)
+          Chip(
+            key: const Key('chip-vivos'),
+            avatar: const Icon(Icons.favorite, size: 16, color: Color(0xFF059669)),
+            label: Text('Pollitos vivos actuales: $_vivos'),
+          ),
+        if (sexadoValido)
+          Chip(
+            key: const Key('chip-pendientes'),
+            avatar: const Icon(Icons.help_outline, size: 16, color: Colors.orange),
+            label: Text('Pendientes por definir sexo: ${_vivos - _sexados}'),
+          ),
+      ],
+    );
+  }
+
   void _mostrarError(String mensaje) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Row(children: [const Icon(Icons.error_outline, color: Colors.white), const SizedBox(width: 10), Expanded(child: Text(mensaje))]),
@@ -234,7 +291,9 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
     // un ítem con su nombre desnormalizado para no perder el vínculo (RN-03/04)
     // y para que DropdownButtonFormField no falle por valor inexistente.
     List<DropdownMenuItem<String>> itemsProgenitor(List<Gallo> lista, String? idActual, String? nombreGuardado) {
-      final items = lista.map((g) => DropdownMenuItem(value: g.id, child: Text(g.nombre))).toList();
+      final items = lista
+          .map((g) => DropdownMenuItem(value: g.id, child: Text(g.etiquetaSelector, overflow: TextOverflow.ellipsis)))
+          .toList();
       if (idActual != null && !lista.any((g) => g.id == idActual)) {
         items.add(DropdownMenuItem(value: idActual, child: Text('${nombreGuardado ?? 'Desconocido'} (eliminado)')));
       }
@@ -254,10 +313,20 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
               key: _formKey,
               child: Column(
                 children: [
+                  const Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: Text('* Campos obligatorios',
+                          style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey)),
+                    ),
+                  ),
                   _buildCard('🧬 Los Padres', [
                     DropdownButtonFormField<String>(
                       key: ValueKey('padre-$_padreId'),
-                      decoration: _inputDeco('Padre (Macho)', FontAwesomeIcons.mars),
+                      isExpanded: true,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      decoration: _inputDeco('Padre (Padrote) *', FontAwesomeIcons.mars),
                       initialValue: _padreId,
                       items: itemsProgenitor(padres, _padreId, widget.cruceEditar?.nombrePadre),
                       onChanged: (v) => setState(() => _padreId = v),
@@ -266,7 +335,9 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                     const SizedBox(height: 15),
                     DropdownButtonFormField<String>(
                       key: ValueKey('madre-$_madreId'),
-                      decoration: _inputDeco('Madre (Hembra)', FontAwesomeIcons.venus),
+                      isExpanded: true,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      decoration: _inputDeco('Madre (Madrilla) *', FontAwesomeIcons.venus),
                       initialValue: _madreId,
                       items: itemsProgenitor(madres, _madreId, widget.cruceEditar?.nombreMadre),
                       onChanged: (v) => setState(() => _madreId = v),
@@ -282,7 +353,7 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                         child: TextFormField(
                           controller: _ctrlFecha,
                           readOnly: true,
-                          decoration: _inputDeco('Fecha', FontAwesomeIcons.calendar),
+                          decoration: _inputDeco('Fecha del Cruce / Nacimiento *', FontAwesomeIcons.calendar),
                           onTap: () async {
                             final d = await showDatePicker(context: context, initialDate: _fechaSeleccionada, firstDate: DateTime(2020), lastDate: DateTime.now());
                             if (d != null) {
@@ -314,26 +385,30 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                       children: [
                         Expanded(
                           child: TextFormField(
+                            key: const Key('campo-nacidos'),
                             controller: _ctrlCantidad,
                             keyboardType: TextInputType.number,
                             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                             maxLength: 3,
-                            decoration: _inputDeco('Total Huevos', FontAwesomeIcons.egg),
+                            autovalidateMode: AutovalidateMode.onUserInteraction,
+                            decoration: _inputDeco('Pollitos Nacidos *', FontAwesomeIcons.egg),
                             validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
-                            onChanged: (v) => setState((){}),
+                            onChanged: (_) => _revalidarConteos(),
                           ),
                         ),
                         const SizedBox(width: 15),
                         Expanded(
                           child: TextFormField(
+                            key: _claveMuertos,
                             controller: _ctrlMuertos,
                             keyboardType: TextInputType.number,
                             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                             maxLength: 3,
                             style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                            decoration: _inputDeco('Bajas/Muertos', FontAwesomeIcons.skull),
-                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
-                            onChanged: (v) => setState((){}),
+                            autovalidateMode: AutovalidateMode.onUserInteraction,
+                            decoration: _inputDeco('Bajas / Muertos *', FontAwesomeIcons.skull).copyWith(errorMaxLines: 3),
+                            validator: _validarMuertos,
+                            onChanged: (_) => _revalidarConteos(),
                           ),
                         ),
                       ],
@@ -342,30 +417,40 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
                     const SizedBox(height: 15),
                     const Divider(),
                     const SizedBox(height: 10),
-                    const Text('Sexado (La suma no puede superar los vivos)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12)),
+                    const Text('Clasificación por Sexo', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 13)),
+                    const SizedBox(height: 10),
+                    _buildResumenCamada(),
                     const SizedBox(height: 10),
 
                     Row(
                       children: [
                         Expanded(
                           child: TextFormField(
+                            key: _claveMachos,
                             controller: _ctrlMachos,
                             keyboardType: TextInputType.number,
                             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                             maxLength: 3,
                             style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.bold),
-                            decoration: _inputDeco('Machos', FontAwesomeIcons.mars),
+                            autovalidateMode: AutovalidateMode.onUserInteraction,
+                            decoration: _inputDeco('Machos', FontAwesomeIcons.mars).copyWith(errorMaxLines: 3),
+                            validator: _validarSexado,
+                            onChanged: (_) => _revalidarConteos(),
                           ),
                         ),
                         const SizedBox(width: 15),
                         Expanded(
                           child: TextFormField(
+                            key: _claveHembras,
                             controller: _ctrlHembras,
                             keyboardType: TextInputType.number,
                             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                             maxLength: 3,
                             style: TextStyle(color: Colors.pink.shade700, fontWeight: FontWeight.bold),
-                            decoration: _inputDeco('Hembras', FontAwesomeIcons.venus),
+                            autovalidateMode: AutovalidateMode.onUserInteraction,
+                            decoration: _inputDeco('Hembras', FontAwesomeIcons.venus).copyWith(errorMaxLines: 3),
+                            validator: _validarSexado,
+                            onChanged: (_) => _revalidarConteos(),
                           ),
                         ),
                       ],
@@ -374,21 +459,31 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
 
                   const SizedBox(height: 20),
 
-                  _buildCard('🏷️ Identificación Inclusiva', [
+                  _buildCard('Marcaje e Identificación de la Camada (Pollitos)', [
                       DropdownButtonFormField<String>(
                         key: ValueKey('marca-$_pataMarca'),
                         initialValue: _pataMarca,
                         isExpanded: true, // Para que los textos largos no se corten
                         items: _opcionesIdentificacion.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
                         onChanged: (v) => setState(() => _pataMarca = v!),
-                        decoration: _inputDeco('Zona de Marca', FontAwesomeIcons.locationDot),
+                        decoration: _inputDeco('Ubicación de la marca en los pollitos', FontAwesomeIcons.locationDot),
                       ),
                       const SizedBox(height: 15),
                       TextFormField(
+                        key: const Key('campo-detalle-marca'),
                         controller: _ctrlMarca,
                         maxLines: 2,
-                        maxLength: 60,
-                        decoration: _inputDeco('Detalle (Ej: Argolla roja #2, Placa 55)', FontAwesomeIcons.tag),
+                        maxLength: CruceModelo.maxDetalleMarca,
+                        inputFormatters: [FilteringTextInputFormatter.allow(CruceModelo.caracteresDetalleMarca)],
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        validator: _validarDetalleMarca,
+                        decoration: _inputDeco(
+                          'Detalle de placa, color de cintillo, marca del lote o placa/anillo',
+                          FontAwesomeIcons.tag,
+                        ).copyWith(
+                          hintText: 'Ej: Cintillo verde, Placas #201 a #205, Marca en ala...',
+                          errorMaxLines: 2,
+                        ),
                       ),
                   ]),
 

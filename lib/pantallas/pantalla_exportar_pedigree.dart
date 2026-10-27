@@ -160,7 +160,7 @@ class _PantallaExportarPedigreeState extends State<PantallaExportarPedigree> {
           await tempFile.writeAsBytes(imageBytes);
 
           if (soloCompartir) {
-            await Share.shareXFiles([XFile(tempFile.path)], text: 'Certificado de Pedigrí - ${widget.gallo.nombre}');
+            await Share.shareXFiles([XFile(tempFile.path)], text: 'Certificado de Pedigrí - ${widget.gallo.nombreMostrar}');
           } else {
             if (Platform.isAndroid || Platform.isIOS) {
               await Gal.putImage(tempFile.path);

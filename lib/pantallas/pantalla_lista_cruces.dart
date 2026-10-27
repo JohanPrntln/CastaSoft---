@@ -214,7 +214,7 @@ class _PantallaListaCrucesState extends State<PantallaListaCruces> {
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text('${c.nombrePadre} x ${c.nombreMadre}', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 15)),
+                                          Text('${c.nombrePadre.trim().isEmpty ? 'Sin apodo' : c.nombrePadre} x ${c.nombreMadre.trim().isEmpty ? 'Sin apodo' : c.nombreMadre}', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 15)),
                                           const SizedBox(height: 4),
                                           Row(children: [FaIcon(FontAwesomeIcons.calendar, size: 12, color: Colors.grey.shade500), const SizedBox(width: 5), Text(DateFormat('dd MMM yyyy').format(c.fechaCruce), style: const TextStyle(color: Colors.grey, fontSize: 12))]),
                                           const SizedBox(height: 8),

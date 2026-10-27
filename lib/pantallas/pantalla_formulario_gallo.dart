@@ -210,6 +210,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   /// no puede validarlas: se revisan aquí los datos obligatorios.
   String? _validarDatosObligatorios() {
     if (_ctrlPlaca.text.trim().isEmpty) return 'La placa / anillo es obligatoria';
+    if (_placaDuplicada(_ctrlPlaca.text)) return mensajePlacaDuplicada;
     if (_ctrlNombre.text.trim().isEmpty) return 'El nombre es obligatorio';
     // La regla anti-basura aplica al texto manual; un valor ya guardado que se
     // conserva desde el desplegable no se bloquea (retrocompatibilidad).
@@ -221,6 +222,18 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     final errorPeso = Gallo.validarPeso(_ctrlPesoActual.text, obligatorio: true);
     if (errorPeso != null) return 'Peso Actual: $errorPeso';
     return null;
+  }
+
+  static const String mensajePlacaDuplicada = 'Esta placa ya está registrada en otro ejemplar de este criadero';
+
+  /// RN-01 en tiempo real contra los ejemplares en memoria (excluye el propio en edición).
+  bool _placaDuplicada(String placa) => context
+      .read<GallosProveedor>()
+      .validarPlacaDuplicada(placa, idExcluir: widget.galloEditar?.id);
+
+  String? _validarPlaca(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Requerido';
+    return _placaDuplicada(v) ? mensajePlacaDuplicada : null;
   }
 
   static String? _requerido(String? v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null;
@@ -498,6 +511,9 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
 
   // PESTAÑA 1
   Widget _buildTabDatos() {
+    // Escucha el proveedor para recalcular la disponibilidad de la placa
+    context.watch<GallosProveedor>();
+    final placaDisponible = _ctrlPlaca.text.trim().isNotEmpty && !_placaDuplicada(_ctrlPlaca.text);
     final opcionesLinea = _opcionesHibridas(Gallo.lineasGeneticasBase, widget.galloEditar?.lineaGenetica);
     final opcionesColor = _opcionesHibridas(Gallo.coloresPlumaBase, widget.galloEditar?.colorPluma);
 
@@ -511,21 +527,36 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
+        const Align(
+          alignment: Alignment.centerRight,
+          child: Text('* Campos obligatorios',
+              style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey)),
+        ),
+        const SizedBox(height: 8),
         _buildFotoPicker(),
         const SizedBox(height: 20),
         _buildCard('Identificación', [
           _buildResponsiveDualInput(
-            _buildInput(_ctrlPlaca, 'Placa / Anillo', icon: FontAwesomeIcons.tag, validacion: true, maxLength: 30),
-            _buildInput(_ctrlNombre, 'Nombre', icon: FontAwesomeIcons.signature, validacion: true, maxLength: 40)
+            _buildInput(
+              _ctrlPlaca, 'Placa / Anillo *',
+              key: const Key('campo-placa'),
+              icon: FontAwesomeIcons.tag,
+              maxLength: 30,
+              validator: _validarPlaca,
+              helperText: placaDisponible ? '✓ Placa disponible' : null,
+              onChanged: (_) => setState(() {}),
+            ),
+            // El nombre es obligatorio pero puede repetirse (la placa es la identidad)
+            _buildInput(_ctrlNombre, 'Nombre *', icon: FontAwesomeIcons.signature, validacion: true, maxLength: 40)
           ),
           const SizedBox(height: 15),
           _buildResponsiveDualInput(
-            _buildDropdown('Sexo', ['Macho', 'Hembra'], _sexo, (v) => setState(() {
+            _buildDropdown('Sexo *', ['Macho', 'Hembra'], _sexo, validator: _requerido, (v) => setState(() {
               _sexo = v;
               // Coherencia biológica: la etapa debe existir para el nuevo sexo
               if (!Gallo.etapasParaSexo(v).contains(_etapaVida)) _etapaVida = 'Cría';
             })),
-            _buildInput(_ctrlFecha, 'Fec. Nacimiento', icon: FontAwesomeIcons.calendar, readOnly: true, onTap: _seleccionarFecha)
+            _buildInput(_ctrlFecha, 'Fecha de Nacimiento *', icon: FontAwesomeIcons.calendar, readOnly: true, onTap: _seleccionarFecha)
           ),
           const SizedBox(height: 15),
           _buildResponsiveDualInput(
@@ -538,7 +569,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
           _buildResponsiveDualInput(
             _buildSelectorHibrido(
               claveBase: 'linea',
-              label: 'Línea Genética',
+              label: 'Línea Genética *',
               icon: FontAwesomeIcons.dna,
               ctrl: _ctrlLinea,
               opciones: opcionesLinea,
@@ -550,7 +581,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
             ),
             _buildSelectorHibrido(
               claveBase: 'color',
-              label: 'Color Pluma',
+              label: 'Color Pluma *',
               icon: FontAwesomeIcons.palette,
               ctrl: _ctrlColor,
               opciones: opcionesColor,
@@ -564,12 +595,12 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
           const SizedBox(height: 15),
           _buildResponsiveDualInput(
             _buildDropdown('Cresta', ['Sierra', 'Rosa', 'Pava', 'Boton', 'Simple'], _tipoCresta, (v) => setState(() => _tipoCresta = v)),
-            _buildDropdown('Fase Lunar', Gallo.opcionesFaseLunar(_faseLunar), _faseLunar, (v) => setState(() => _faseLunar = v),
+            _buildDropdown('Fase Lunar *', Gallo.opcionesFaseLunar(_faseLunar), _faseLunar, (v) => setState(() => _faseLunar = v),
                 icon: FontAwesomeIcons.moon, validator: (v) => v == null ? 'Requerido' : null),
           ),
           const SizedBox(height: 15),
           _buildInput(
-            _ctrlPesoActual, 'Peso Actual (Lbs)',
+            _ctrlPesoActual, 'Peso Actual (Lbs) *',
             key: const Key('campo-peso-actual'),
             isNumber: true,
             icon: FontAwesomeIcons.weightScale,
@@ -604,7 +635,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
             key: ValueKey('padre-$padreVisible'),
             isExpanded: true,
             initialValue: padreVisible,
-            items: padres.map((g) => DropdownMenuItem(value: g.id, child: Text('${g.nombre} (${g.placa})', overflow: TextOverflow.ellipsis))).toList(),
+            items: padres.map((g) => DropdownMenuItem(value: g.id, child: Text(g.etiquetaSelector, overflow: TextOverflow.ellipsis))).toList(),
             onChanged: (v) {
               setState(() {
                 _padreId = v;
@@ -624,7 +655,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
             key: ValueKey('madre-$madreVisible'),
             isExpanded: true,
             initialValue: madreVisible,
-            items: madres.map((g) => DropdownMenuItem(value: g.id, child: Text('${g.nombre} (${g.placa})', overflow: TextOverflow.ellipsis))).toList(),
+            items: madres.map((g) => DropdownMenuItem(value: g.id, child: Text(g.etiquetaSelector, overflow: TextOverflow.ellipsis))).toList(),
             onChanged: (v) {
               setState(() {
                 _madreId = v;
@@ -758,10 +789,15 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
       List<TextInputFormatter>? formatters,
       String? Function(String?)? validator,
       Widget? suffixIcon,
+      String? helperText,
+      ValueChanged<String>? onChanged,
     }) {
+    final tieneValidacion = validacion || validator != null;
     return TextFormField(
       key: key,
       controller: ctrl,
+      onChanged: onChanged,
+      autovalidateMode: tieneValidacion ? AutovalidateMode.onUserInteraction : null,
       keyboardType: isNumber 
           ? const TextInputType.numberWithOptions(decimal: true) 
           : TextInputType.text,
@@ -772,16 +808,19 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
       inputFormatters: isMoney 
           ? [FilteringTextInputFormatter.digitsOnly, CurrencyInputFormatter()] 
           : formatters,
-      decoration: _inputDeco(label, icon: icon, suffixIcon: suffixIcon),
+      decoration: _inputDeco(label, icon: icon, suffixIcon: suffixIcon, helperText: helperText),
       validator: validator ??
           (validacion ? (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null : null),
     );
   }
 
-  InputDecoration _inputDeco(String label, {dynamic icon, Widget? suffixIcon, String? hintText}) {
+  InputDecoration _inputDeco(String label, {dynamic icon, Widget? suffixIcon, String? hintText, String? helperText}) {
     return InputDecoration(
       labelText: label,
       hintText: hintText,
+      helperText: helperText,
+      helperStyle: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
+      errorMaxLines: 2,
       labelStyle: const TextStyle(fontSize: 13),
       prefixIcon: icon != null 
           ? IconoAdaptativo.prefijo(icon, size: 18, color: const Color(0xFF1E3A8A))
@@ -799,6 +838,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
       key: ValueKey('$label-$valor'),
       isExpanded: true,
       initialValue: items.contains(valor) ? valor : null,
+      autovalidateMode: validator != null ? AutovalidateMode.onUserInteraction : null,
       decoration: _inputDeco(label, icon: icon),
       items: items.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 14)))).toList(),
       onChanged: onChanged,
@@ -855,6 +895,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
       key: ValueKey('$claveBase-$actual'),
       isExpanded: true,
       initialValue: opciones.contains(actual) ? actual : null,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       decoration: _inputDeco(label, icon: icon),
       items: opciones
           .map((e) => DropdownMenuItem(value: e, child: Text(e, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14))))

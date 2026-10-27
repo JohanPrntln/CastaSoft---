@@ -67,14 +67,38 @@ class CruceModelo {
       return 'Las cantidades no pueden ser negativas';
     }
     if (pollitosMuertos > cantidadHuevos) {
-      return 'No pueden haber más muertos ($pollitosMuertos) que el total ($cantidadHuevos)';
+      return mensajeMuertosExcedidos(pollitosMuertos, cantidadHuevos);
     }
     final int vivos = cantidadHuevos - pollitosMuertos;
     final int sexados = pollitosMachos + pollitosHembras;
     if (sexados > vivos) {
-      return 'Error: Tienes $vivos vivos, pero $sexados sexados ($pollitosMachos M + $pollitosHembras H).';
+      return mensajeSexadoExcedido(sexados, vivos);
     }
     return null;
+  }
+
+  static String mensajeMuertosExcedidos(int muertos, int nacidos) =>
+      'No puedes registrar más bajas ($muertos) que los pollitos nacidos ($nacidos)';
+
+  static String mensajeSexadoExcedido(int suma, int vivos) =>
+      'La suma de machos y hembras ($suma) supera los pollitos vivos actuales ($vivos)';
+
+  /// Caracteres permitidos en el detalle de marcaje de la camada.
+  static final RegExp caracteresDetalleMarca = RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9\s#\-,.]');
+  static const int maxDetalleMarca = 80;
+  static const String mensajeDetalleMarcaInvalido =
+      'Ingresa un detalle válido: mínimo 3 caracteres (letras, números, #, -, coma o punto)';
+
+  /// Detalle opcional del marcaje: si se escribe, 3-80 caracteres permitidos y
+  /// al menos una letra o número (no solo símbolos). No exige unicidad.
+  static String? validarDetalleMarca(String? valor) {
+    final texto = valor?.trim() ?? '';
+    if (texto.isEmpty) return null;
+    final valido = texto.length >= 3 &&
+        texto.length <= maxDetalleMarca &&
+        texto.split('').every(caracteresDetalleMarca.hasMatch) &&
+        RegExp(r'[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ0-9]').hasMatch(texto);
+    return valido ? null : mensajeDetalleMarcaInvalido;
   }
 
   /// Aplica [validarReglasNegocio] sobre esta instancia.
