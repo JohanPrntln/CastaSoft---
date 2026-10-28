@@ -1,14 +1,17 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import 'package:castasoft/componentes/boton_limpiar_duplicados.dart';
 import 'package:castasoft/componentes/icono_adaptativo.dart';
+import 'package:castasoft/componentes/selector_foto.dart';
 import 'package:castasoft/componentes/tarjeta_gallo.dart';
 import 'package:castasoft/modelos/cruce_modelo.dart';
 import 'package:castasoft/modelos/foto_base64.dart';
@@ -1049,6 +1052,124 @@ void main() {
       expect(find.text('Limpieza completada: se eliminaron 2 copias duplicadas. Quedaron 2 ejemplares únicos.'),
           findsOneWidget);
       expect(proveedor.gallos.map((g) => g.id), unorderedEquals(['padre', 'madre']));
+    });
+  });
+
+  // ==================== FOTOS: CÁMARA / GALERÍA ====================
+
+  group('Selector de foto (cámara y galería)', () {
+    // PNG válido de 1x1 px
+    final png = base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
+
+    late List<ImageSource> origenes;
+    Future<XFile?> falso(ImageSource origen) async {
+      origenes.add(origen);
+      return XFile.fromData(png, name: 'foto.png', mimeType: 'image/png');
+    }
+
+    setUp(() => origenes = []);
+
+    Future<void> abrirGallo(WidgetTester tester, {Gallo? editar, SeleccionarImagen? seleccionar}) async {
+      tester.view.physicalSize = const Size(1200, 3200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(ChangeNotifierProvider<GallosProveedor>(
+        create: (_) => GallosProveedor.enMemoria([if (editar != null) editar]),
+        child: MaterialApp(
+          home: PantallaFormularioGallo(galloEditar: editar, seleccionarImagen: seleccionar ?? falso),
+        ),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> tocar(WidgetTester tester, Finder objetivo) async {
+      await tester.ensureVisible(objetivo);
+      await tester.tap(objetivo);
+      await tester.pumpAndSettle();
+    }
+
+    final selector = find.byKey(const Key('selector-foto'));
+    final miniatura = find.descendant(of: selector, matching: find.byType(Container));
+    bool hayVistaPrevia(WidgetTester tester) =>
+        (tester.widget<Container>(miniatura).decoration as BoxDecoration).image != null;
+
+    testWidgets('muestra Cámara, Galería y Cancelar; Cancelar no altera la foto', (tester) async {
+      await abrirGallo(tester);
+      await tocar(tester, selector);
+      expect(find.text('Tomar foto (Cámara)'), findsOneWidget);
+      expect(find.text('Seleccionar de la galería'), findsOneWidget);
+      await tocar(tester, find.text('Cancelar'));
+      expect(origenes, isEmpty);
+      expect(find.text('Tocar para agregar foto'), findsOneWidget);
+      expect(find.text('Quitar foto'), findsNothing);
+    });
+
+    testWidgets('elegir de la galería muestra la vista previa y "Quitar foto" la limpia', (tester) async {
+      await abrirGallo(tester);
+      await tocar(tester, selector);
+      await tocar(tester, find.text('Seleccionar de la galería'));
+      expect(origenes, [ImageSource.gallery]);
+      expect(hayVistaPrevia(tester), isTrue);
+      expect(find.text('Cambiar foto'), findsOneWidget);
+
+      await tocar(tester, find.text('Quitar foto'));
+      expect(find.text('¿Deseas quitar la fotografía?'), findsOneWidget);
+      await tocar(tester, find.widgetWithText(TextButton, 'Quitar'));
+      expect(hayVistaPrevia(tester), isFalse);
+      expect(find.text('Tocar para agregar foto'), findsOneWidget);
+      expect(find.text('Quitar foto'), findsNothing);
+    });
+
+    testWidgets('"Cambiar foto" vuelve a ofrecer el origen y usa la cámara', (tester) async {
+      await abrirGallo(tester);
+      await tocar(tester, selector);
+      await tocar(tester, find.text('Seleccionar de la galería'));
+      await tocar(tester, find.text('Cambiar foto'));
+      await tocar(tester, find.text('Tomar foto (Cámara)'));
+      expect(origenes, [ImageSource.gallery, ImageSource.camera]);
+      expect(hayVistaPrevia(tester), isTrue);
+    });
+
+    testWidgets('edición: la foto guardada se puede quitar; cancelar la confirmación la conserva', (tester) async {
+      final guardado = Gallo.fromMap(galloCompleto().toMap()..['fotoPath'] = '$prefijoFotoBase64${base64Encode(png)}');
+      await abrirGallo(tester, editar: guardado);
+      expect(hayVistaPrevia(tester), isTrue);
+      await tocar(tester, find.text('Quitar foto'));
+      await tocar(tester, find.widgetWithText(TextButton, 'Cancelar'));
+      expect(hayVistaPrevia(tester), isTrue);
+      await tocar(tester, find.text('Quitar foto'));
+      await tocar(tester, find.widgetWithText(TextButton, 'Quitar'));
+      expect(hayVistaPrevia(tester), isFalse);
+    });
+
+    testWidgets('permiso denegado: no crashea, avisa y deja la foto igual', (tester) async {
+      await abrirGallo(tester,
+          seleccionar: (_) async => throw PlatformException(code: 'camera_access_denied'));
+      await tocar(tester, selector);
+      await tocar(tester, find.text('Tomar foto (Cámara)'));
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('No se pudo abrir la cámara'), findsOneWidget);
+      expect(find.text('Tocar para agregar foto'), findsOneWidget);
+    });
+
+    testWidgets('formulario de cruce: galería, vista previa y quitar', (tester) async {
+      tester.view.physicalSize = const Size(1200, 3200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(ChangeNotifierProvider<GallosProveedor>(
+        create: (_) => GallosProveedor.enMemoria(const []),
+        child: MaterialApp(home: PantallaFormularioCruce(seleccionarImagen: falso)),
+      ));
+      await tester.pumpAndSettle();
+      await tocar(tester, selector);
+      expect(find.text('Tomar foto (Cámara)'), findsOneWidget);
+      await tocar(tester, find.text('Seleccionar de la galería'));
+      expect(hayVistaPrevia(tester), isTrue);
+      await tocar(tester, find.text('Quitar foto'));
+      await tocar(tester, find.widgetWithText(TextButton, 'Quitar'));
+      expect(hayVistaPrevia(tester), isFalse);
+      expect(find.text('Quitar foto'), findsNothing);
     });
   });
 }

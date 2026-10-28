@@ -1,22 +1,23 @@
 import 'dart:convert';
-import 'dart:io' show File;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart'; 
 import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
 import 'package:castasoft/componentes/icono_adaptativo.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:castasoft/componentes/selector_foto.dart';
 
 
 class PantallaFormularioGallo extends StatefulWidget {
   final Gallo? galloEditar;
-  const PantallaFormularioGallo({super.key, this.galloEditar});
+
+  /// Reemplaza a `ImagePicker` en pruebas automatizadas.
+  final SeleccionarImagen? seleccionarImagen;
+  const PantallaFormularioGallo({super.key, this.galloEditar, this.seleccionarImagen});
 
   @override
   State<PantallaFormularioGallo> createState() => _PantallaFormularioGalloState();
@@ -64,8 +65,9 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   String? _madreId;
   
   bool _esEdicion = false;
-  XFile? _imagenNuevaSeleccionada; 
+  Uint8List? _fotoNuevaBytes; // Foto recién tomada/elegida (aún sin guardar)
   Uint8List? _fotoActualBytes; // Foto guardada (ya decodificada y memoizada en el modelo)
+  String? _fotoActualPath; // Valor guardado en `fotoPath`; null si el usuario la quitó
 
   List<String> _listaVacunas = [];
   List<String> _listaPeleas = [];
@@ -97,7 +99,6 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   /// La fecha va en su propio botón: se impide escribir "dd/mm/yyyy" en el texto.
   static final TextInputFormatter _sinFechas = FilteringTextInputFormatter.deny(RegExp(r'/'));
 
-  final ImagePicker _picker = ImagePicker();
   bool _estaGuardando = false;
 
   @override
@@ -156,6 +157,7 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     _padreId = g.padreId;
     _madreId = g.madreId;
     _fotoActualBytes = g.fotoBytes;
+    _fotoActualPath = g.fotoPath;
   }
 
   void _valoresPorDefecto() {
@@ -181,18 +183,6 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   }
 
   String _formatearFecha(DateTime fecha) => '${fecha.day}/${fecha.month}/${fecha.year}';
-
-  Future<void> _seleccionarImagen() async {
-    final XFile? image = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 30, 
-      maxWidth: 800,    
-    );
-    if (image != null) {
-      // Guardamos el XFile directamente sin convertirlo
-      setState(() => _imagenNuevaSeleccionada = image); 
-    }
-}
 
   double? _limpiarNumero(String valor, {bool esDinero = false}) {
     if (valor.trim().isEmpty) return null;
@@ -329,11 +319,10 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
     try {
       
       String? fotoFinalString;
-      if (_imagenNuevaSeleccionada != null) {
-        final bytes = await _imagenNuevaSeleccionada!.readAsBytes();
-        fotoFinalString = 'base64,${base64Encode(bytes)}';
+      if (_fotoNuevaBytes != null) {
+        fotoFinalString = 'base64,${base64Encode(_fotoNuevaBytes!)}';
       } else {
-        fotoFinalString = widget.galloEditar?.fotoPath;
+        fotoFinalString = _fotoActualPath; // null si se quitó la foto
       }
 
       final gallo = Gallo(
@@ -468,34 +457,19 @@ class _PantallaFormularioGalloState extends State<PantallaFormularioGallo> with 
   }
 
   Widget _buildFotoPicker() {
-    ImageProvider? imagenMostrar;
-    if (_imagenNuevaSeleccionada != null) {
-      // 🔥 EL TRUCO SE MANTIENE
-      imagenMostrar = kIsWeb 
-          ? NetworkImage(_imagenNuevaSeleccionada!.path) as ImageProvider 
-          // Reconstruimos el File solo para el renderizado nativo
-          : FileImage(File(_imagenNuevaSeleccionada!.path)); 
-    } else if (_fotoActualBytes != null) {
-      imagenMostrar = MemoryImage(_fotoActualBytes!);
-    }
-
+    final hayFotoGuardada = _fotoActualPath != null && _fotoActualPath!.isNotEmpty;
     return Center(
-      child: GestureDetector(
-        onTap: _seleccionarImagen,
-        child: Container(
-          width: 150, height: 150,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: Colors.grey.shade300),
-            image: imagenMostrar != null 
-                ? DecorationImage(image: imagenMostrar, fit: BoxFit.cover) 
-                : null,
-          ),
-          child: imagenMostrar == null 
-              ? const Icon(Icons.add_a_photo, size: 50, color: Color(0xFF1E3A8A)) 
-              : null,
-        ),
+      child: SelectorFoto(
+        bytes: _fotoNuevaBytes ?? _fotoActualBytes,
+        hayFotoGuardada: hayFotoGuardada,
+        ancho: 150,
+        seleccionar: widget.seleccionarImagen,
+        onSeleccionada: (bytes) => setState(() => _fotoNuevaBytes = bytes),
+        onQuitada: () => setState(() {
+          _fotoNuevaBytes = null;
+          _fotoActualBytes = null;
+          _fotoActualPath = null;
+        }),
       ),
     );
   }

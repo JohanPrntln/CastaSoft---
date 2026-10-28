@@ -1,15 +1,13 @@
 import 'dart:convert';
-import 'dart:io' show File;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:castasoft/componentes/selector_foto.dart';
 
 import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/modelos/cruce_modelo.dart';
@@ -19,7 +17,10 @@ import 'package:castasoft/componentes/icono_adaptativo.dart';
 
 class PantallaFormularioCruce extends StatefulWidget {
   final CruceModelo? cruceEditar; 
-  const PantallaFormularioCruce({super.key, this.cruceEditar});
+
+  /// Reemplaza a `ImagePicker` en pruebas automatizadas.
+  final SeleccionarImagen? seleccionarImagen;
+  const PantallaFormularioCruce({super.key, this.cruceEditar, this.seleccionarImagen});
 
   @override
   State<PantallaFormularioCruce> createState() => _PantallaFormularioCruceState();
@@ -63,7 +64,7 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
   ];
 
   DateTime _fechaSeleccionada = DateTime.now();
-  XFile? _imagenNueva;
+  Uint8List? _fotoNuevaBytes; // Foto recién tomada/elegida (aún sin guardar)
   String? _fotoActualBase64; 
   Uint8List? _fotoActualBytes; // Decodificada una sola vez (memoizada en el modelo)
   bool _guardando = false;
@@ -113,19 +114,10 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
     _fotoActualBytes = c.fotoBytes;
   }
 
-  Future<void> _seleccionarFoto() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 25, maxWidth: 800);
-    if (picked != null) {
-      // Lo asignamos directo, sin el File()
-      setState(() => _imagenNueva = picked); 
-    }
-  }
-
   // 🔥 NUEVO: Función para borrar la foto
   void _borrarFoto() {
     setState(() {
-      _imagenNueva = null;
+      _fotoNuevaBytes = null;
       _fotoActualBase64 = null;
       _fotoActualBytes = null;
     });
@@ -174,9 +166,8 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
 
       String? fotoFinal;
       // Lógica: Si hay imagen nueva, úsala. Si no hay nueva pero hay vieja, usa vieja. Si ambas son null (porque se borró), manda null.
-      if (_imagenNueva != null) {
-        final bytes = await _imagenNueva!.readAsBytes();
-        fotoFinal = 'base64,${base64Encode(bytes)}';
+      if (_fotoNuevaBytes != null) {
+        fotoFinal = 'base64,${base64Encode(_fotoNuevaBytes!)}';
       } else {
         fotoFinal = _fotoActualBase64;
       }
@@ -536,63 +527,16 @@ class _PantallaFormularioCruceState extends State<PantallaFormularioCruce> {
     );
   }
 
-  // 🔥 WIDGET DE FOTO CON BOTÓN DE BORRAR
   Widget _buildFotoPreview() {
-    ImageProvider? imgProvider;
-    bool hayFoto = false;
-
-    if (_imagenNueva != null) {
-      // 🔥 AQUÍ USAMOS kIsWeb Y DESAPARECE TU AVISO
-      imgProvider = kIsWeb 
-          ? NetworkImage(_imagenNueva!.path) as ImageProvider 
-          : FileImage(File(_imagenNueva!.path));
-      hayFoto = true;
-    } else if (_fotoActualBytes != null) {
-      imgProvider = MemoryImage(_fotoActualBytes!);
-      hayFoto = true;
-    } else if (_fotoActualBase64 != null) {
-      hayFoto = true; // Foto corrupta/ilegible: igual se permite borrarla
-    }
-
-    return Stack(
-      children: [
-        GestureDetector(
-          onTap: _seleccionarFoto,
-          child: Container(
-            height: 150,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade100,
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(12),
-              image: imgProvider != null ? DecorationImage(image: imgProvider, fit: BoxFit.cover) : null,
-            ),
-            child: imgProvider == null 
-              ? Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.camera_alt, size: 40, color: _colorTema),
-                    Text('Tocar para agregar foto', style: TextStyle(color: _colorTema))
-                  ],
-                )
-              : null,
-          ),
-        ),
-        
-        // BOTÓN DE BORRAR (SOLO SI HAY FOTO)
-        if (hayFoto)
-          Positioned(
-            top: 5, right: 5,
-            child: GestureDetector(
-              onTap: _borrarFoto,
-              child: Container(
-                padding: const EdgeInsets.all(5),
-                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                child: const Icon(Icons.close, color: Colors.white, size: 18),
-              ),
-            ),
-          ),
-      ],
+    return SelectorFoto(
+      bytes: _fotoNuevaBytes ?? _fotoActualBytes,
+      // Foto corrupta/ilegible: igual se permite cambiarla o quitarla
+      hayFotoGuardada: _fotoActualBase64 != null,
+      calidad: 25,
+      color: _colorTema,
+      seleccionar: widget.seleccionarImagen,
+      onSeleccionada: (bytes) => setState(() => _fotoNuevaBytes = bytes),
+      onQuitada: _borrarFoto,
     );
   }
 
