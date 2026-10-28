@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:castasoft/modelos/gallo_modelo.dart'; // Importamos el modelo por si acaso
+import 'package:castasoft/servicios/deduplicacion.dart';
 
 class ServicioFirestore {
   // Patrón Singleton
@@ -124,6 +125,29 @@ class ServicioFirestore {
   Future<bool> eliminarGallo(String idGallo) async {
     if (!estaAutenticado) throw Exception('Debes iniciar sesión');
     return confirmarEscritura(_firestore.collection('gallos').doc(idGallo).delete());
+  }
+
+  /// BUG-18: aplica un [PlanLimpieza] del perfil activo en lotes atómicos.
+  /// Primero re-vincula padres/madres hacia los originales y luego borra las
+  /// copias. No toca archivos de fotos: las copias comparten `fotoPath` con
+  /// el original. Todos los IDs provienen de listas filtradas por `userId`.
+  Future<void> aplicarLimpiezaDuplicados(PlanLimpieza plan) async {
+    if (!estaAutenticado) throw Exception('Debes iniciar sesión');
+    final gallos = _firestore.collection('gallos');
+    final cruces = _firestore.collection('cruces');
+    final operaciones = <void Function(WriteBatch)>[
+      for (final e in plan.gallosRevincular.entries)
+        (b) => b.update(gallos.doc(e.key), {...e.value, 'userId': uidUsuarioActual}),
+      for (final e in plan.crucesRevincular.entries) (b) => b.update(cruces.doc(e.key), e.value),
+      for (final id in plan.idsCrucesEliminar) (b) => b.delete(cruces.doc(id)),
+      for (final id in plan.idsGallosEliminar) (b) => b.delete(gallos.doc(id)),
+    ];
+    // Límite de Firestore: 500 operaciones por lote
+    for (var i = 0; i < operaciones.length; i += 450) {
+      final lote = _firestore.batch();
+      operaciones.skip(i).take(450).forEach((op) => op(lote));
+      await confirmarEscritura(lote.commit());
+    }
   }
 
   // === MÉTODO DE COMPATIBILIDAD (Por si el proveedor usa guardarGallo) ===

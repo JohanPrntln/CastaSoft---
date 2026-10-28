@@ -12,7 +12,9 @@ class CrucesProveedor with ChangeNotifier {
   bool get cargando => _cargando;
 
   // 1. CARGAR CRUCES (CORREGIDO PARA LEER DATOS ANTIGUOS)
-  Future<void> cargarCruces() async {
+  /// Con [lanzarErrores] el fallo se propaga: lo usan la restauración y la
+  /// limpieza de duplicados, que no deben operar con una lista incompleta.
+  Future<void> cargarCruces({bool lanzarErrores = false}) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
@@ -37,6 +39,7 @@ class CrucesProveedor with ChangeNotifier {
       
     } catch (e) {
       debugPrint("Error cargando cruces: $e");
+      if (lanzarErrores) rethrow;
     } finally {
       _cargando = false;
       notifyListeners();

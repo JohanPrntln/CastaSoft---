@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import 'package:castasoft/componentes/boton_limpiar_duplicados.dart';
 import 'package:castasoft/componentes/icono_adaptativo.dart';
 import 'package:castasoft/componentes/tarjeta_gallo.dart';
 import 'package:castasoft/modelos/cruce_modelo.dart';
@@ -15,6 +16,7 @@ import 'package:castasoft/modelos/gallo_modelo.dart';
 import 'package:castasoft/pantallas/pantalla_formulario_cruce.dart';
 import 'package:castasoft/pantallas/pantalla_formulario_gallo.dart';
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
+import 'package:castasoft/servicios/deduplicacion.dart';
 
 Gallo galloCompleto({
   String id = 'gc',
@@ -838,6 +840,215 @@ void main() {
       expect(tester.takeException(), isNull);
       final nombre = tester.widget<Text>(find.text('Relámpago Dorado del Valle Alto'));
       expect(nombre.maxLines, 2);
+    });
+  });
+
+  // ==================== BUG-18: RESPALDOS SIN DUPLICADOS ====================
+
+  Gallo ejemplar(String id, {String placa = '', String nombre = '', String? padreId, String? madreId,
+          List<String> vacunas = const []}) =>
+      Gallo(
+        id: id, userId: 'uidA', placa: placa, nombre: nombre, sexo: 'Macho', fechaNacimiento: DateTime(2024, 3, 1),
+        lineaGenetica: 'Kelso', colorPluma: 'Giro', faseLunar: 'Luna llena', estado: 'Activo',
+        pesoActual: 4.5, padreId: padreId, madreId: madreId, vacunas: vacunas,
+      );
+
+  CruceModelo cruce(String id, String padreId, String madreId) => CruceModelo(
+        id: id, userId: 'uidA', padreId: padreId, nombrePadre: 'P', madreId: madreId, nombreMadre: 'M',
+        fechaCruce: DateTime(2025, 1, 10), faseLunar: 'Luna llena', cantidadPollitos: 8, pollitosMuertos: 1,
+        pollitosVivos: 7, pollitosMachos: 3, pollitosHembras: 2, pataMarca: 'Derecha', detalleMarca: 'Muesca 1',
+      );
+
+  String Function(String) generadorIds() {
+    var n = 0;
+    return (coleccion) => '$coleccion-nuevo-${++n}';
+  }
+
+  group('BUG-18: restauración JSON idempotente', () {
+    test('no duplica los existentes (por id, placa o firma) y solo agrega el nuevo', () {
+      final existentes = [
+        ejemplar('g1', placa: 'A7', nombre: 'Rayo'),
+        ejemplar('g2', placa: 'B2', nombre: 'Trueno'),
+        ejemplar('g3', nombre: ''), // histórico sin placa ni nombre
+      ];
+      final proveedor = GallosProveedor.enMemoria(existentes);
+      // Respaldo exportado: mismos ejemplares (uno con otro id y placa con
+      // mayúsculas/espacios distintos) + 1 ejemplar nuevo hijo de Rayo.
+      final json = [
+        ejemplar('g1', placa: 'A7', nombre: 'Rayo').toMap(),
+        ejemplar('viejo-2', placa: ' b2 ', nombre: 'Trueno').toMap(),
+        ejemplar('viejo-3', nombre: '').toMap(),
+        ejemplar('viejo-4', placa: 'P9', nombre: 'Prueba', padreId: 'g1').toMap(),
+      ];
+      final plan = proveedor.planificarImportacion(
+        uid: 'uidA', crucesExistentes: const [], gallosJson: json, crucesJson: const [], generarId: generadorIds(),
+      );
+      expect(plan.gallosOmitidos, 3);
+      expect(plan.gallosNuevos, hasLength(1));
+      final nuevo = plan.gallosNuevos.single;
+      expect(nuevo['placa'], 'P9');
+      expect(nuevo['id'], 'gallos-nuevo-1');
+      expect(nuevo['userId'], 'uidA');
+      expect(nuevo['padreId'], 'g1');
+      expect(plan.mensajeResultado,
+          'Restauración completada: 1 registros nuevos agregados, 3 registros existentes omitidos para evitar duplicados.');
+    });
+
+    test('repetidos dentro del mismo archivo se insertan una sola vez y la genealogía apunta al insertado', () {
+      final proveedor = GallosProveedor.enMemoria(const []);
+      final plan = proveedor.planificarImportacion(
+        uid: 'uidB',
+        crucesExistentes: const [],
+        gallosJson: [
+          ejemplar('x1', placa: 'Z1', nombre: 'Uno').toMap(),
+          ejemplar('x2', placa: 'z1', nombre: 'Uno copia').toMap(),
+          ejemplar('x3', placa: 'Z3', nombre: 'Hijo', padreId: 'x2').toMap(),
+        ],
+        crucesJson: const [],
+        generarId: generadorIds(),
+      );
+      expect(plan.gallosNuevos.map((g) => g['placa']), ['Z1', 'Z3']);
+      expect(plan.gallosOmitidos, 1);
+      expect(plan.gallosNuevos.last['padreId'], plan.gallosNuevos.first['id']);
+      expect(plan.gallosNuevos.every((g) => g['userId'] == 'uidB'), isTrue);
+    });
+
+    test('cruces existentes se omiten por id o por firma (con padres re-vinculados)', () {
+      final proveedor = GallosProveedor.enMemoria([ejemplar('p', placa: 'P'), ejemplar('m', placa: 'M')]);
+      final plan = proveedor.planificarImportacion(
+        uid: 'uidA',
+        crucesExistentes: [cruce('c1', 'p', 'm')],
+        gallosJson: [ejemplar('p-viejo', placa: 'P').toMap(), ejemplar('m-viejo', placa: 'M').toMap()],
+        crucesJson: [
+          cruce('c-viejo', 'p-viejo', 'm-viejo').toMap(), // misma firma que c1
+          cruce('c1', 'p', 'm').toMap(), // mismo id
+          (cruce('c-nuevo', 'p-viejo', 'm-viejo').toMap()..['cantidadPollitos'] = 10),
+        ],
+        generarId: generadorIds(),
+      );
+      expect(plan.gallosNuevos, isEmpty);
+      expect(plan.crucesOmitidos, 2);
+      expect(plan.crucesNuevos, hasLength(1));
+      expect(plan.crucesNuevos.single['padreId'], 'p');
+      expect(plan.crucesNuevos.single['madreId'], 'm');
+      expect(plan.crucesNuevos.single['id'], 'cruces-nuevo-1');
+    });
+  });
+
+  group('BUG-18: limpieza segura de duplicados', () {
+    test('conserva 1 por grupo (placa y firma sin placa/nombre)', () {
+      final proveedor = GallosProveedor.enMemoria([
+        ejemplar('a1', placa: 'A7', nombre: 'Rayo'),
+        ejemplar('a2', placa: ' a7 ', nombre: 'Rayo'),
+        ejemplar('a3', placa: 'A7', nombre: ''),
+        ejemplar('h1'),
+        ejemplar('h2'),
+        ejemplar('u1', placa: 'U1', nombre: 'Único'),
+      ]);
+      final plan = proveedor.planificarLimpiezaDuplicados(const []);
+      expect(plan.copias, 3);
+      expect(plan.unicos, 3);
+      expect(plan.idsGallosEliminar, isNot(contains('u1')));
+      expect(plan.mensajeConfirmacion, contains('• Ejemplares únicos originales a conservar: 3'));
+      expect(plan.mensajeConfirmacion, contains('• Copias duplicadas detectadas para eliminar: 3'));
+    });
+
+    test('siempre conserva el id referenciado en un cruce y re-vincula las referencias a copias', () async {
+      final proveedor = GallosProveedor.enMemoria([
+        // La copia tiene más datos, pero el original es padre en un cruce
+        ejemplar('copia', placa: 'A7', nombre: 'Rayo', vacunas: ['Newcastle (01/01/2025)']),
+        ejemplar('original', placa: 'A7', nombre: 'Rayo'),
+        ejemplar('madre', placa: 'M1', nombre: 'Luna'),
+        ejemplar('hijo', placa: 'H1', nombre: 'Hijo', padreId: 'copia', madreId: 'madre'),
+        ejemplar('hijo2', placa: 'H2', nombre: 'Hijo 2', padreId: 'original'),
+      ]);
+      final cruces = [
+        cruce('c1', 'original', 'madre'),
+        cruce('c2', 'copia', 'madre'), // copia de c1 creada por la restauración
+        CruceModelo.fromMap(cruce('c3', 'original', 'madre').toMap()..['cantidadPollitos'] = 12),
+      ];
+      final plan = proveedor.planificarLimpiezaDuplicados(cruces);
+      // Ambos están referenciados; gana el de más vínculos aunque tenga menos datos
+      expect(plan.idsGallosEliminar, ['copia']);
+      expect(plan.reemplazos, {'copia': 'original'});
+      expect(plan.gallosRevincular, {'hijo': {'padreId': 'original'}});
+      // c2 apuntaba a la copia: es el mismo cruce que c1 y se elimina
+      expect(plan.idsCrucesEliminar, ['c2']);
+
+      await proveedor.ejecutarLimpiezaDuplicados(plan);
+      expect(proveedor.gallos.map((g) => g.id), ['original', 'madre', 'hijo', 'hijo2']);
+      expect(proveedor.obtenerGalloPorId('hijo')!.padreId, 'original');
+    });
+
+    test('referenciado solo como padre de otro gallo gana aunque tenga menos datos', () {
+      final proveedor = GallosProveedor.enMemoria([
+        ejemplar('rico', placa: 'B1', vacunas: ['Marek (02/02/2025)', 'Gumboro (03/03/2025)']),
+        ejemplar('vinculado', placa: 'b1'),
+        ejemplar('cria', placa: 'C1', madreId: 'vinculado'),
+      ]);
+      final plan = proveedor.planificarLimpiezaDuplicados(const []);
+      expect(plan.idsGallosEliminar, ['rico']);
+    });
+
+    test('rechaza planes con ejemplares que no son del criadero activo', () {
+      final proveedor = GallosProveedor.enMemoria([ejemplar('a', placa: 'A')]);
+      final ajeno = Deduplicacion.planificarLimpieza(
+        gallos: [ejemplar('otro1', placa: 'X'), ejemplar('otro2', placa: 'X')],
+        cruces: const [],
+      );
+      expect(() => proveedor.ejecutarLimpiezaDuplicados(ajeno), throwsException);
+      expect(proveedor.gallos, hasLength(1));
+    });
+
+    Future<GallosProveedor> pantallaLimpieza(WidgetTester tester, List<Gallo> gallos,
+        {List<CruceModelo> cruces = const []}) async {
+      final proveedor = GallosProveedor.enMemoria(gallos);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: BotonLimpiarDuplicados(
+            diagnosticar: () async => proveedor.planificarLimpiezaDuplicados(cruces),
+            ejecutar: proveedor.ejecutarLimpiezaDuplicados,
+          ),
+        ),
+      ));
+      await tester.tap(find.text('🧹 Limpiar registros duplicados'));
+      await tester.pumpAndSettle();
+      return proveedor;
+    }
+
+    testWidgets('botón sin duplicados: mensaje informativo y sin diálogo', (tester) async {
+      await pantallaLimpieza(tester, [ejemplar('a', placa: 'A'), ejemplar('b', placa: 'B')]);
+      expect(find.text('No se encontraron registros duplicados en este criadero.'), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('botón: vista previa, "Cancelar" no borra nada', (tester) async {
+      final proveedor = await pantallaLimpieza(tester, [ejemplar('a', placa: 'A'), ejemplar('b', placa: 'A')]);
+      expect(find.text('Confirmar limpieza de duplicados'), findsOneWidget);
+      expect(find.textContaining('• Copias duplicadas detectadas para eliminar: 1'), findsOneWidget);
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      expect(proveedor.gallos, hasLength(2));
+    });
+
+    testWidgets('botón: "Sí, eliminar duplicados" conserva el referenciado y confirma', (tester) async {
+      final proveedor = await pantallaLimpieza(
+        tester,
+        [
+          ejemplar('copia1', placa: 'A7', nombre: 'Rayo'),
+          ejemplar('padre', placa: 'A7', nombre: 'Rayo'),
+          ejemplar('copia2', placa: 'a7', nombre: ''),
+          ejemplar('madre', placa: 'M1', nombre: 'Luna'),
+        ],
+        cruces: [cruce('c1', 'padre', 'madre')],
+      );
+      expect(find.textContaining('• Ejemplares únicos originales a conservar: 2'), findsOneWidget);
+      expect(find.textContaining('¿Deseas eliminar las 2 copias duplicadas?'), findsOneWidget);
+      await tester.tap(find.text('Sí, eliminar duplicados'));
+      await tester.pumpAndSettle();
+      expect(find.text('Limpieza completada: se eliminaron 2 copias duplicadas. Quedaron 2 ejemplares únicos.'),
+          findsOneWidget);
+      expect(proveedor.gallos.map((g) => g.id), unorderedEquals(['padre', 'madre']));
     });
   });
 }

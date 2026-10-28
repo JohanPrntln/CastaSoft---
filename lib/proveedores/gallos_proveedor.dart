@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io' show File;
 import 'package:flutter/foundation.dart';
+import 'package:castasoft/modelos/cruce_modelo.dart';
 import 'package:castasoft/modelos/gallo_modelo.dart';
+import 'package:castasoft/servicios/deduplicacion.dart';
 import 'package:castasoft/servicios/servicio_firestore.dart'; 
 
 class GallosProveedor extends ChangeNotifier {
@@ -10,6 +12,8 @@ class GallosProveedor extends ChangeNotifier {
   Map<String, Gallo> _indicePorId = {};
   // true cuando ya llegó al menos un snapshot (de servidor o de caché local)
   bool _datosCargados = false;
+  // true en el constructor de pruebas: las escrituras solo tocan la RAM
+  bool _enMemoria = false;
   // `late`: no toca Firebase hasta usarse (permite el constructor en memoria).
   late final ServicioFirestore _servicioFirestore = ServicioFirestore();
   StreamSubscription? _gallosSubscription;
@@ -40,6 +44,7 @@ class GallosProveedor extends ChangeNotifier {
     _gallos = List.of(gallos);
     _indicePorId = {for (final g in gallos) g.id: g};
     _datosCargados = true;
+    _enMemoria = true;
   }
 
   void _iniciarEscuchaEnTiempoReal() {
@@ -75,6 +80,9 @@ class GallosProveedor extends ChangeNotifier {
 
   // ==================== GETTERS ====================
   List<Gallo> get gallos => List<Gallo>.unmodifiable(_gallos);
+
+  /// true cuando la lista ya refleja el perfil activo (al menos un snapshot).
+  bool get datosCargados => _datosCargados;
 
   // 🔥 NUEVO: Getter que revisa si hay gallos con etiquetas viejas
   bool get requiereActualizacionEtapa {
@@ -226,6 +234,53 @@ class GallosProveedor extends ChangeNotifier {
     return _servicioFirestore.validarPlacaDuplicada(placa, idExcluir: idExcluir);
   }
   
+  // ==================== BUG-18: RESPALDOS SIN DUPLICADOS ====================
+
+  /// Planifica una restauración JSON contra los ejemplares del perfil activo
+  /// (`_gallos`, que la consulta en tiempo real ya filtra por `userId`).
+  PlanImportacion planificarImportacion({
+    required String uid,
+    required List<CruceModelo> crucesExistentes,
+    required List<Map<String, dynamic>> gallosJson,
+    required List<Map<String, dynamic>> crucesJson,
+    required String Function(String coleccion) generarId,
+  }) {
+    return Deduplicacion.planificarImportacion(
+      uid: uid,
+      gallosExistentes: _gallos,
+      crucesExistentes: crucesExistentes,
+      gallosJson: gallosJson,
+      crucesJson: crucesJson,
+      generarId: generarId,
+    );
+  }
+
+  /// Diagnóstico en memoria (no borra nada) de las copias del perfil activo.
+  PlanLimpieza planificarLimpiezaDuplicados(List<CruceModelo> cruces) {
+    if (!_datosCargados) throw Exception('Los ejemplares aún se están cargando. Intenta de nuevo.');
+    return Deduplicacion.planificarLimpieza(gallos: _gallos, cruces: cruces);
+  }
+
+  /// Elimina las copias de [plan] y re-vincula la genealogía a los originales.
+  /// Rechaza el plan si menciona ejemplares que no son del perfil activo.
+  Future<void> ejecutarLimpiezaDuplicados(PlanLimpieza plan) async {
+    final ajenos = [...plan.idsGallosEliminar, ...plan.gallosRevincular.keys]
+        .where((id) => !_indicePorId.containsKey(id));
+    if (ajenos.isNotEmpty) throw Exception('El plan de limpieza no corresponde al criadero actual.');
+    if (!_enMemoria) return _servicioFirestore.aplicarLimpiezaDuplicados(plan);
+
+    final eliminar = plan.idsGallosEliminar.toSet();
+    _gallos = [
+      for (final g in _gallos)
+        if (!eliminar.contains(g.id))
+          plan.gallosRevincular.containsKey(g.id)
+              ? Gallo.fromMap(g.toMap()..addAll(plan.gallosRevincular[g.id]!))
+              : g,
+    ];
+    _indicePorId = {for (final g in _gallos) g.id: g};
+    notifyListeners();
+  }
+
   Future<void> cargarGallos() async {}
 
   @override

@@ -7,6 +7,8 @@ import 'package:castasoft/proveedores/usuario_proveedor.dart';
 import 'package:castasoft/proveedores/gallos_proveedor.dart';
 import 'package:castasoft/proveedores/cruces_proveedor.dart';
 import 'package:castasoft/servicios/servicio_backup.dart';
+import 'package:castasoft/servicios/deduplicacion.dart';
+import 'package:castasoft/componentes/boton_limpiar_duplicados.dart';
 
 class PantallaCentroSeguridad extends StatefulWidget {
   const PantallaCentroSeguridad({super.key});
@@ -96,7 +98,7 @@ class _PantallaCentroSeguridadState extends State<PantallaCentroSeguridad> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Row(children: [Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 30), SizedBox(width: 10), Text('Atención')]),
-        content: const Text('Vas a inyectar un archivo de respaldo en tu cuenta actual.\n\nAsegúrate de que este archivo sea tuyo y de confianza. ¿Deseas continuar?'),
+        content: const Text('Vas a inyectar un archivo de respaldo en tu cuenta actual.\n\nLos registros que ya existen en este criadero se omitirán automáticamente para evitar duplicados.\n\nAsegúrate de que este archivo sea tuyo y de confianza. ¿Deseas continuar?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCELAR', style: TextStyle(color: Colors.grey))),
           ElevatedButton(
@@ -121,8 +123,21 @@ class _PantallaCentroSeguridadState extends State<PantallaCentroSeguridad> {
 
     try {
       final String uid = FirebaseAuth.instance.currentUser!.uid;
-      
-      await ServicioBackup.restaurarBackupJSON(uid);
+      final backupData = await ServicioBackup.leerArchivoRespaldo();
+
+      // BUG-18: se compara contra los datos COMPLETOS del perfil activo; si
+      // no se pueden leer, se aborta en lugar de arriesgar duplicados.
+      if (!gallosProv.datosCargados) {
+        throw Exception('Los ejemplares aún se están cargando. Intenta de nuevo en unos segundos.');
+      }
+      await crucesProv.cargarCruces(lanzarErrores: true);
+
+      final PlanImportacion plan = await ServicioBackup.restaurarBackupJSON(
+        uid: uid,
+        backupData: backupData,
+        gallosProv: gallosProv,
+        crucesExistentes: crucesProv.cruces,
+      );
       
       // 🔥 Recargamos todos los proveedores para que la pantalla principal se actualice sola
       if (mounted) {
@@ -132,7 +147,8 @@ class _PantallaCentroSeguridadState extends State<PantallaCentroSeguridad> {
         
         messenger.showSnackBar(
           SnackBar(
-            content: const Text('¡Criadero restaurado con éxito! Los datos ya están en la nube.', style: TextStyle(fontWeight: FontWeight.bold)),
+            content: Text(plan.mensajeResultado, style: const TextStyle(fontWeight: FontWeight.bold)),
+            duration: const Duration(seconds: 6),
             backgroundColor: Colors.blue.shade700,
             behavior: SnackBarBehavior.floating,
           ),
@@ -143,6 +159,22 @@ class _PantallaCentroSeguridadState extends State<PantallaCentroSeguridad> {
     } finally {
       if (mounted) setState(() => _cargandoRestauracion = false);
     }
+  }
+
+  // --- LIMPIAR DUPLICADOS (solo el perfil activo) ---
+  Future<PlanLimpieza> _diagnosticarDuplicados() async {
+    final gallosProv = context.read<GallosProveedor>();
+    final crucesProv = context.read<CrucesProveedor>();
+    // Lista de cruces fresca y completa: protege los vínculos genealógicos
+    await crucesProv.cargarCruces(lanzarErrores: true);
+    return gallosProv.planificarLimpiezaDuplicados(crucesProv.cruces);
+  }
+
+  Future<void> _eliminarDuplicados(PlanLimpieza plan) async {
+    final gallosProv = context.read<GallosProveedor>();
+    final crucesProv = context.read<CrucesProveedor>();
+    await gallosProv.ejecutarLimpiezaDuplicados(plan);
+    await crucesProv.cargarCruces();
   }
 
   @override
@@ -200,7 +232,27 @@ class _PantallaCentroSeguridadState extends State<PantallaCentroSeguridad> {
 
             const SizedBox(height: 20),
 
-            // TARJETA 3: REPORTE PDF
+            // TARJETA 3: LIMPIEZA DE DUPLICADOS (BUG-18)
+            _buildCardOpcion(
+              titulo: 'Limpiar Registros Duplicados',
+              descripcion: 'Detecta copias repetidas de ejemplares y cruces en este criadero. Verás una vista previa antes de borrar. '
+                  'Recomendado: genera un respaldo antes de limpiar.',
+              icono: FontAwesomeIcons.broom,
+              colorIcono: Colors.deepPurple.shade600,
+              botonTexto: '',
+              botonColor: Colors.deepPurple.shade700,
+              cargando: false,
+              onTap: () {},
+              accion: BotonLimpiarDuplicados(
+                color: Colors.deepPurple.shade700,
+                diagnosticar: _diagnosticarDuplicados,
+                ejecutar: _eliminarDuplicados,
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // TARJETA 4: REPORTE PDF
             _buildCardOpcion(
               titulo: 'Reporte de Inventario (PDF)',
               descripcion: 'Genera un documento visual con formato de tabla para imprimir.',
@@ -220,6 +272,7 @@ class _PantallaCentroSeguridadState extends State<PantallaCentroSeguridad> {
   Widget _buildCardOpcion({
     required String titulo, required String descripcion, required dynamic icono, required Color colorIcono,
     required String botonTexto, required Color botonColor, required bool cargando, required VoidCallback onTap,
+    Widget? accion, // reemplaza al botón estándar
   }) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -248,7 +301,7 @@ class _PantallaCentroSeguridadState extends State<PantallaCentroSeguridad> {
           const SizedBox(height: 12),
           Text(descripcion, style: TextStyle(color: Colors.grey.shade600, fontSize: 13, height: 1.4)),
           const SizedBox(height: 20),
-          SizedBox(
+          accion ?? SizedBox(
             width: double.infinity, height: 45,
             child: ElevatedButton(
               onPressed: cargando ? null : onTap,
@@ -260,4 +313,4 @@ class _PantallaCentroSeguridadState extends State<PantallaCentroSeguridad> {
       ),
     );
   }
-}
+}
