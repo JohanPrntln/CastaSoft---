@@ -17,7 +17,7 @@ import 'package:google_fonts/google_fonts.dart';
 /// ```
 class LogoMarca extends StatelessWidget {
   /// Constructor del componente LogoMarca
-  const LogoMarca({Key? key}) : super(key: key);
+  const LogoMarca({super.key});
 
   @override
   Widget build(BuildContext context) {

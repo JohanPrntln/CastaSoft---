@@ -1,4 +1,13 @@
-import 'package:sqflite/sqflite.dart';
+// ============================================================================
+// ⚠️ CÓDIGO LEGADO AISLADO (Auditoría técnica, oct-2026)
+// ----------------------------------------------------------------------------
+// La arquitectura vigente (tesis) persiste el 100% de los datos en Cloud
+// Firestore + su caché offline. Esta clase ya NO se importa ni se inicializa
+// desde `main.dart` (antes abría un archivo SQLite en cada arranque nativo sin
+// que ningún proveedor lo leyera). Se conserva únicamente como referencia
+// histórica / posible migración de datos locales antiguos; al no estar
+// importada, el compilador la excluye del binario y del bundle Web.
+// ============================================================================
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io' show Platform, Directory;
@@ -65,9 +74,11 @@ class AyudanteDB {
     // Abrir o crear la base de datos
     _baseDatos = await openDatabase(
       rutaDB,
-      version: 1,
+      // Incrementamos la versión para soportar nuevas columnas en la tabla Gallos
+      version: 2,
       onCreate: _crearTablas,
       onConfigure: _configurarBaseDatos,
+      onUpgrade: _onUpgrade,
     );
 
     return _baseDatos;
@@ -141,6 +152,11 @@ class AyudanteDB {
         fechaNacimiento TEXT NOT NULL,
         idPadre TEXT,
         idMadre TEXT,
+        padreId TEXT,
+        madreId TEXT,
+        peso REAL,
+        jaula TEXT,
+        criaderoOrigen TEXT DEFAULT 'Propio',
         lineaGenetica TEXT NOT NULL,
         colorPluma TEXT NOT NULL,
         faseLunar TEXT NOT NULL,
@@ -160,6 +176,45 @@ class AyudanteDB {
     await database.execute(
       'CREATE INDEX idx_gallos_lineaGenetica ON Gallos(lineaGenetica)',
     );
+  }
+
+  /// Maneja actualizaciones del esquema de la base de datos
+  ///
+  /// Añade de forma segura las columnas nuevas que requieren los modelos
+  /// actuales. Para evitar errores en instalaciones existentes, primero
+  /// inspecciona las columnas presentes y solo ejecuta los `ALTER TABLE`
+  /// para las que faltan.
+  Future<void> _onUpgrade(
+    Database database,
+    int oldVersion,
+    int newVersion,
+  ) async {
+    if (oldVersion < 2) {
+      // Obtener lista de columnas existentes
+      final List<Map<String, Object?>> info = await database.rawQuery(
+        "PRAGMA table_info(Gallos)",
+      );
+      final existingColumns = info.map((row) => row['name'] as String).toSet();
+
+      // Definiciones de las nuevas columnas que queremos asegurar
+      final columnsToAdd = <String, String>{
+        'padreId': 'TEXT',
+        'madreId': 'TEXT',
+        'peso': 'REAL',
+        'jaula': 'TEXT',
+        'criaderoOrigen': "TEXT DEFAULT 'Propio'",
+      };
+
+      for (final entry in columnsToAdd.entries) {
+        final columnName = entry.key;
+        final definition = entry.value;
+        if (!existingColumns.contains(columnName)) {
+          await database.execute(
+            'ALTER TABLE Gallos ADD COLUMN $columnName $definition',
+          );
+        }
+      }
+    }
   }
 
   /// Cierra la conexión a la base de datos

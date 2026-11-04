@@ -38,3 +38,8 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
+# Solución para error de Firebase C2220 / C4996
+if(MSVC)
+  add_compile_options(/wd4996)
+  add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+endif()

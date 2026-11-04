@@ -41,6 +41,10 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>CastaSoft usa la cámara para tomar fotos de tus ejemplares y cruces.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CastaSoft accede a tu galería para elegir fotos de tus ejemplares y cruces.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
