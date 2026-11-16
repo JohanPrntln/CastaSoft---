@@ -201,7 +201,7 @@ El árbol (padres y abuelos paternos/maternos) se construye en memoria. El certi
 ### Instalación
 
 ```bash
-git clone <URL_DEL_REPOSITORIO> castasoft
+git clone https://github.com/JohanPrntln/CastaSoft---.git castasoft
 cd castasoft
 flutter pub get
 flutter doctor
